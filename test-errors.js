@@ -72,6 +72,25 @@ const cases = [
   }
 
   print("");
+  print("pagination targets:");
+  const linkCases = [
+    ['<https://api.github.com/orgs/x/repos?page=2>; rel="next"', "next page on the API host"],
+    ['<https://api.github.com.evil.example/repos?page=2>; rel="next"', "lookalike host"],
+    ['<https://api.github.com@evil.example/repos>; rel="next"', "userinfo trick"],
+    ['<http://api.github.com/orgs/x/repos?page=2>; rel="next"', "downgraded to http"],
+    ['<https://api.github.com\t@evil.example/repos>; rel="next"', "tab that fetch strips"],
+    ['<https://api.github.com\\@evil.example/repos>; rel="next"', "backslash as separator"],
+    ['<https://evil.example/repos>; rel="prev"', "no next link at all"]
+  ];
+  for (const [header, label] of linkCases) {
+    try {
+      print(`  ${label}: ${nextPageUrl(header) ?? "(stop)"}`);
+    } catch (err) {
+      print(`  ${label}: refused, ${err.message}`);
+    }
+  }
+
+  print("");
   print("config errors (no network call made):");
   for (const message of ["No access token saved yet.", "No organization saved yet."]) {
     const err = configError(message);

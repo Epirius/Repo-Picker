@@ -10,6 +10,7 @@ const CAPTURE_ID = "token-capture";
 const OWNER_MIN_PX = 800;
 const DESCRIPTION_MIN_PX = 1200;
 const SEPARATOR = " · ";
+const PAGE_PREFIX = `${API}/`;
 const PATH_RE = /^[^\s/]+\/[^\s/]+$/;
 
 let memo = null;
@@ -44,11 +45,22 @@ async function setStatus(fields) {
   });
 }
 
+function onApiHost(url) {
+  // fetch() strips whitespace and rewrites backslashes before parsing, so a URL
+  // carrying either can pass a prefix test and still resolve to another host.
+  if (/[\s\\]/.test(url)) return false;
+  return url.slice(0, PAGE_PREFIX.length).toLowerCase() === PAGE_PREFIX;
+}
+
 function nextPageUrl(linkHeader) {
   if (!linkHeader) return null;
   for (const part of linkHeader.split(",")) {
-    const m = part.match(/<([^>]+)>\s*;\s*rel="next"/);
-    if (m) return m[1];
+    const url = part.match(/<([^>]+)>\s*;\s*rel="next"/)?.[1];
+    if (!url) continue;
+    if (!onApiHost(url)) {
+      throw new GitHubError(`Refusing to send the token to ${url}, which is not api.github.com.`);
+    }
+    return url;
   }
   return null;
 }

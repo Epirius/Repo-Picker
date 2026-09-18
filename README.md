@@ -177,7 +177,8 @@ The script matches on the token format, `ghp_` plus 36 characters or `github_pat
 full value GitHub shows you once, right after creation.
 
 The token sits in `browser.storage.local` for this profile. It never leaves the browser
-except in requests to `api.github.com`.
+except in requests to `api.github.com`. Pagination follows the `Link` header, so that
+header is checked against the API host before the next request carries the token.
 
 ## Files
 
