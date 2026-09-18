@@ -1,10 +1,12 @@
 const CONFIG_KEY = "config";
 const CACHE_KEY = "repoCache";
 const ORIGINS = { origins: ["https://api.github.com/*"] };
+const CAPTURE = { origins: ["https://github.com/settings/*"] };
 
 const orgsEl = document.getElementById("orgs");
 const tokenEl = document.getElementById("token");
 const personalEl = document.getElementById("personal");
+const captureEl = document.getElementById("capture");
 const saveEl = document.getElementById("save");
 const refreshEl = document.getElementById("refresh");
 const statusEl = document.getElementById("status");
@@ -48,8 +50,18 @@ async function load() {
   orgsEl.value = (config.orgs || []).join("\n");
   tokenEl.value = config.token || "";
   personalEl.checked = Boolean(config.includePersonal);
+  captureEl.checked = await browser.permissions.contains(CAPTURE);
   await showCacheState();
 }
+
+captureEl.addEventListener("change", async () => {
+  if (captureEl.checked) {
+    captureEl.checked = await browser.permissions.request(CAPTURE);
+    if (!captureEl.checked) say("Access to the GitHub settings page was declined.", "error");
+  } else {
+    await browser.permissions.remove(CAPTURE);
+  }
+});
 
 async function fetchNow() {
   saveEl.disabled = true;
@@ -92,5 +104,11 @@ saveEl.addEventListener("click", async () => {
 });
 
 refreshEl.addEventListener("click", fetchNow);
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (changes[CONFIG_KEY]) tokenEl.value = changes[CONFIG_KEY].newValue?.token || "";
+  if (changes[CACHE_KEY]) showCacheState();
+});
 
 load();

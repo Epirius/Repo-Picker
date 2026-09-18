@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitHub repo omnibox",
-  "version": "1.0.0",
+  "version": "1.0.5",
   "description": "Type gh in the address bar, then a repo name, to jump straight to it.",
   "browser_specific_settings": {
     "gecko": {
@@ -9,16 +9,27 @@
       "strict_min_version": "128.0"
     }
   },
-  "permissions": ["storage", "alarms"],
-  "host_permissions": ["https://api.github.com/*"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.github.com/*"
+  ],
   "omnibox": {
     "keyword": "gh"
   },
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
-  }
+  },
+  "optional_host_permissions": [
+    "https://github.com/settings/*"
+  ]
 }

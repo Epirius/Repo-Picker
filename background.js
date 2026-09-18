@@ -5,6 +5,8 @@ const STATUS_KEY = "status";
 const REFRESH_ALARM = "refresh-repos";
 const STALE_MS = 6 * 60 * 60 * 1000;
 const MAX_SUGGESTIONS = 8;
+const CAPTURE_ORIGIN = "https://github.com/settings/*";
+const CAPTURE_ID = "token-capture";
 const OWNER_MIN_PX = 800;
 const DESCRIPTION_MIN_PX = 1200;
 const SEPARATOR = " · ";
@@ -366,6 +368,37 @@ async function fetchResult() {
   }
 }
 
+async function syncCapture() {
+  const granted = await browser.permissions.contains({ origins: [CAPTURE_ORIGIN] });
+  const registered = await browser.scripting.getRegisteredContentScripts({ ids: [CAPTURE_ID] });
+
+  if (granted && !registered.length) {
+    await browser.scripting.registerContentScripts([
+      {
+        id: CAPTURE_ID,
+        matches: [CAPTURE_ORIGIN],
+        js: ["capture.js"],
+        runAt: "document_idle",
+        persistAcrossSessions: true
+      }
+    ]);
+  } else if (!granted && registered.length) {
+    await browser.scripting.unregisterContentScripts({ ids: [CAPTURE_ID] });
+  }
+}
+
+browser.permissions.onAdded.addListener(syncCapture);
+browser.permissions.onRemoved.addListener(syncCapture);
+syncCapture();
+
 browser.runtime.onMessage.addListener(async (message) => {
   if (message?.type === "refresh") return fetchResult();
+
+  if (message?.type === "token") {
+    const config = await getConfig();
+    await browser.storage.local.set({
+      [CONFIG_KEY]: { ...config, token: message.token }
+    });
+    return { ...(await fetchResult()), saved: true };
+  }
 });

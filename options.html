@@ -116,6 +116,10 @@
         border-color: var(--accent);
         color: var(--bg);
       }
+      .check label .hint {
+        display: block;
+        margin-top: 4px;
+      }
       h2.sub {
         font-size: 13px;
         text-transform: uppercase;
@@ -208,6 +212,18 @@
         </p>
 
         <p class="hint">Either token is stored in this browser profile and nowhere else.</p>
+      </div>
+
+      <div class="field check">
+        <input id="capture" type="checkbox" />
+        <label for="capture">
+          Offer to save tokens straight from the GitHub settings page
+          <span class="hint">
+            Grants access to <code>github.com/settings/*</code> and watches for a freshly generated
+            token there, so you skip the copy and paste. Nothing is stored until you click Save on
+            the prompt.
+          </span>
+        </label>
       </div>
 
       <div class="field check">
