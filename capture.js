@@ -18,6 +18,48 @@ function styleButton(button) {
     "border:1px solid rgba(255,255,255,0.55);background:transparent;color:inherit;cursor:pointer";
 }
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function mark() {
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 64 64");
+  svg.setAttribute("width", "18");
+  svg.setAttribute("height", "18");
+  svg.setAttribute("aria-hidden", "true");
+
+  const plate = document.createElementNS(SVG_NS, "rect");
+  plate.setAttribute("width", "64");
+  plate.setAttribute("height", "64");
+  plate.setAttribute("rx", "14");
+  plate.setAttribute("fill", "#ffffff");
+
+  const lens = document.createElementNS(SVG_NS, "circle");
+  lens.setAttribute("cx", "28");
+  lens.setAttribute("cy", "28");
+  lens.setAttribute("r", "12");
+  lens.setAttribute("fill", "none");
+  lens.setAttribute("stroke", "#1f6feb");
+  lens.setAttribute("stroke-width", "6");
+
+  const handle = document.createElementNS(SVG_NS, "path");
+  handle.setAttribute("d", "M37 37 L48 48");
+  handle.setAttribute("stroke", "#1f6feb");
+  handle.setAttribute("stroke-width", "7");
+  handle.setAttribute("stroke-linecap", "round");
+
+  svg.append(plate, lens, handle);
+  return svg;
+}
+
+function badge() {
+  const wrap = document.createElement("span");
+  wrap.style.cssText =
+    "display:inline-flex;align-items:center;gap:7px;font-weight:700;" +
+    "padding-right:12px;border-right:1px solid rgba(255,255,255,0.4)";
+  wrap.append(mark(), document.createTextNode("Repo Picker"));
+  return wrap;
+}
+
 function actionButton(result) {
   if (result.actionMessage) {
     const button = document.createElement("button");
@@ -46,13 +88,15 @@ function actionButton(result) {
 function showBanner(token) {
   const bar = document.createElement("div");
   bar.id = BANNER_ID;
+  bar.setAttribute("role", "region");
+  bar.setAttribute("aria-label", "Repo Picker");
   bar.style.cssText =
     "position:fixed;inset:0 0 auto 0;z-index:2147483647;display:flex;gap:12px;" +
     "align-items:center;justify-content:center;padding:10px 16px;background:#1f6feb;" +
     "color:#fff;font:14px/1.4 system-ui,sans-serif;box-shadow:0 1px 6px rgba(0,0,0,0.3)";
 
   const text = document.createElement("span");
-  text.textContent = "Save this token to Repo Picker?";
+  text.textContent = "Save this new token so it can index your repositories?";
 
   const save = document.createElement("button");
   save.textContent = "Save";
@@ -82,7 +126,7 @@ function showBanner(token) {
 
   dismiss.addEventListener("click", () => bar.remove());
 
-  bar.append(text, save, dismiss);
+  bar.append(badge(), text, save, dismiss);
   document.body.prepend(bar);
 }
 
