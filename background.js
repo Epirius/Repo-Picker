@@ -5,10 +5,18 @@ const STATUS_KEY = "status";
 const REFRESH_ALARM = "refresh-repos";
 const STALE_MS = 6 * 60 * 60 * 1000;
 const MAX_SUGGESTIONS = 8;
+const OWNER_MIN_PX = 800;
+const DESCRIPTION_MIN_PX = 1200;
+const SEPARATOR = " · ";
+const PATH_RE = /^[^\s/]+\/[^\s/]+$/;
+const CAPTURE_ORIGIN = "https://github.com/settings/*";
+const CAPTURE_ID = "token-capture";
 
 let memo = null;
 let inFlight = null;
 let inputSeq = 0;
+let windowWidth = null;
+let links = new Map();
 
 async function getConfig() {
   const stored = await browser.storage.local.get(CONFIG_KEY);
@@ -16,6 +24,8 @@ async function getConfig() {
     orgs: [],
     token: "",
     includePersonal: false,
+    includeStarred: false,
+    includeFollowing: false,
     ...(stored[CONFIG_KEY] || {})
   };
 }
@@ -23,7 +33,7 @@ async function getConfig() {
 async function getCache() {
   if (memo) return memo;
   const stored = await browser.storage.local.get(CACHE_KEY);
-  memo = stored[CACHE_KEY] || { repos: [], fetchedAt: 0 };
+  memo = stored[CACHE_KEY] || { repos: [], fetchedAt: 0, kinds: {} };
   return memo;
 }
 
@@ -43,50 +53,178 @@ function nextPageUrl(linkHeader) {
   return null;
 }
 
+class GitHubError extends Error {
+  constructor(message, actionUrl, actionLabel) {
+    super(message);
+    this.actionUrl = actionUrl || null;
+    this.actionLabel = actionLabel || null;
+    this.status = 0;
+  }
+}
+
+function configError(message) {
+  const err = new GitHubError(message);
+  err.actionLabel = "Open options";
+  err.actionMessage = "openOptions";
+  return err;
+}
+
+function orgFromUrl(url) {
+  return decodeURIComponent(url.match(/\/(?:orgs|users)\/([^/?]+)/)?.[1] || "");
+}
+
+async function githubError(res, url) {
+  const err = await describeFailure(res, url);
+  err.status = res.status;
+  return err;
+}
+
+async function describeFailure(res, url) {
+  const body = await res.text();
+  let message = body.slice(0, 200);
+  try {
+    message = JSON.parse(body).message || message;
+  } catch {
+    // a non-JSON body is rare, but the raw text is still the best clue
+  }
+
+  const org = orgFromUrl(url);
+
+  if (res.status === 403 && /SAML/i.test(message)) {
+    const sso = res.headers.get("X-GitHub-SSO") || "";
+    const link = sso.match(/url=(\S+)/)?.[1];
+    return new GitHubError(
+      `${org || "This organization"} uses SAML single sign-on, and this token is not authorized for it yet.`,
+      link || (org ? `https://github.com/orgs/${org}/sso` : "https://github.com/settings/tokens"),
+      "Authorize the token"
+    );
+  }
+
+  if (res.status === 401) {
+    return new GitHubError(
+      "GitHub rejected the token. It may be mistyped, revoked or expired.",
+      "https://github.com/settings/tokens",
+      "Manage tokens"
+    );
+  }
+
+  if (res.status === 403 && /rate limit/i.test(message)) {
+    return new GitHubError("GitHub rate limit reached. Try again in a few minutes.");
+  }
+
+  if (res.status === 404 && org) {
+    return new GitHubError(
+      `No organization or user named ${org}, or this token cannot see it. Check the spelling against the URL on GitHub.`
+    );
+  }
+
+  return new GitHubError(`GitHub returned ${res.status}: ${message}`);
+}
+
 async function fetchPaged(url, token) {
   const out = [];
   let next = url;
   while (next) {
-    const res = await fetch(next, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28"
-      }
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`GitHub returned ${res.status}: ${body.slice(0, 200)}`);
+    let res;
+    try {
+      res = await fetch(next, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "X-GitHub-Api-Version": "2022-11-28"
+        }
+      });
+    } catch {
+      throw configError(
+        "Could not reach api.github.com. Open the options page and click Save and fetch to grant access."
+      );
     }
+    if (!res.ok) throw await githubError(res, next);
     out.push(...(await res.json()));
     next = nextPageUrl(res.headers.get("Link"));
   }
   return out;
 }
 
+async function mapLimit(items, limit, worker) {
+  const queue = [...items];
+  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) await worker(queue.shift());
+  });
+  await Promise.all(runners);
+}
+
+async function followedRepos(token) {
+  const following = await fetchPaged(`${API}/user/following?per_page=100`, token);
+  const out = [];
+  await mapLimit(following, 6, async (user) => {
+    try {
+      const repos = await fetchPaged(
+        `${API}/users/${encodeURIComponent(user.login)}/repos?per_page=100&type=owner&sort=pushed`,
+        token
+      );
+      out.push(...repos);
+    } catch {
+      // a followed account can be deleted or made private between the two calls
+    }
+  });
+  return out;
+}
+
+async function ownerRepos(name, token) {
+  const encoded = encodeURIComponent(name);
+  try {
+    return {
+      name,
+      kind: "org",
+      repos: await fetchPaged(`${API}/orgs/${encoded}/repos?per_page=100&type=all&sort=pushed`, token)
+    };
+  } catch (err) {
+    if (err.status !== 404) throw err;
+    return {
+      name,
+      kind: "user",
+      repos: await fetchPaged(`${API}/users/${encoded}/repos?per_page=100&type=owner&sort=pushed`, token)
+    };
+  }
+}
+
 async function refreshRepos() {
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const { orgs, token, includePersonal } = await getConfig();
-    if (!token) throw new Error("No access token set. Open the extension options.");
-    if (!orgs.length && !includePersonal) {
-      throw new Error("No organizations set. Open the extension options.");
+    const { orgs, token, includePersonal, includeStarred, includeFollowing } = await getConfig();
+    if (!token) throw configError("No access token saved yet.");
+    if (!orgs.length && !includePersonal && !includeStarred && !includeFollowing) {
+      throw configError(
+        "No organization saved yet. Add one in the options page, then click Save and fetch."
+      );
     }
 
-    const urls = orgs.map(
-      (org) =>
-        `${API}/orgs/${encodeURIComponent(org)}/repos?per_page=100&type=all&sort=pushed`
-    );
+    const owners = await Promise.all(orgs.map((name) => ownerRepos(name, token)));
+    const kinds = {};
+    const found = [];
+    for (const owner of owners) {
+      kinds[owner.name.toLowerCase()] = owner.kind;
+      found.push(...owner.repos);
+    }
+
+    const urls = [];
     if (includePersonal) {
       urls.push(`${API}/user/repos?per_page=100&affiliation=owner,collaborator&sort=pushed`);
     }
+    if (includeStarred) {
+      urls.push(`${API}/user/starred?per_page=100`);
+    }
 
     const pages = await Promise.all(urls.map((u) => fetchPaged(u, token)));
+    found.push(...pages.flat());
+    if (includeFollowing) found.push(...(await followedRepos(token)));
 
     const byFullName = new Map();
-    for (const repo of pages.flat()) {
+    for (const repo of found) {
       byFullName.set(repo.full_name, {
         name: repo.name,
+        owner: repo.owner?.login || repo.full_name.split("/")[0],
         fullName: repo.full_name,
         url: repo.html_url,
         description: repo.description || "",
@@ -96,16 +234,28 @@ async function refreshRepos() {
     }
 
     const repos = [...byFullName.values()].sort((a, b) => b.pushedAt - a.pushedAt);
-    memo = { repos, fetchedAt: Date.now() };
+    memo = { repos, fetchedAt: Date.now(), kinds };
     await browser.storage.local.set({ [CACHE_KEY]: memo });
-    await setStatus({ count: repos.length, fetchedAt: memo.fetchedAt, error: null });
+    await setStatus({
+      count: repos.length,
+      fetchedAt: memo.fetchedAt,
+      error: null,
+      actionUrl: null,
+      actionLabel: null,
+      actionMessage: null
+    });
     return memo;
   })();
 
   try {
     return await inFlight;
   } catch (err) {
-    await setStatus({ error: String(err.message || err) });
+    await setStatus({
+      error: String(err.message || err),
+      actionUrl: err.actionUrl || null,
+      actionLabel: err.actionLabel || null,
+      actionMessage: err.actionMessage || null
+    });
     throw err;
   } finally {
     inFlight = null;
@@ -163,22 +313,44 @@ function score(repo, query) {
   return value;
 }
 
-function escapeXml(text) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+async function measureWindow() {
+  try {
+    const win = await browser.windows.getCurrent();
+    if (win?.width) windowWidth = win.width;
+  } catch {
+    windowWidth = null;
+  }
+}
+
+function clip(text, limit) {
+  const tidy = text.replace(/\s+/g, " ").trim();
+  return tidy.length > limit ? `${tidy.slice(0, limit - 1)}…` : tidy;
 }
 
 function describe(repo) {
-  const suffix = repo.archived ? " (archived)" : "";
-  const tail = repo.description ? ` ${repo.description.slice(0, 90)}` : "";
-  return `<match>${escapeXml(repo.fullName + suffix)}</match><dim>${escapeXml(tail)}</dim>`;
+  const width = windowWidth ?? DESCRIPTION_MIN_PX;
+  const parts = [repo.archived ? `${repo.name} (archived)` : repo.name];
+
+  if (width >= OWNER_MIN_PX) {
+    parts.push(repo.owner || repo.fullName.split("/")[0]);
+  }
+  if (width >= DESCRIPTION_MIN_PX && repo.description) {
+    parts.push(clip(repo.description, 80));
+  }
+  return parts.join(SEPARATOR);
 }
 
-function searchUrl(query, orgs) {
-  const scope = orgs.length ? orgs.map((o) => `org:${o}`).join(" ") + " " : "";
+function resolveLink(text) {
+  if (links.has(text)) return links.get(text);
+  if (text.startsWith("https://")) return text;
+  if (PATH_RE.test(text)) return `https://github.com/${text}`;
+  return null;
+}
+
+function searchUrl(query, orgs, kinds = {}) {
+  const scope = orgs.length
+    ? orgs.map((o) => `${kinds[o.toLowerCase()] === "user" ? "user" : "org"}:${o}`).join(" ") + " "
+    : "";
   return `https://github.com/search?type=repositories&q=${encodeURIComponent(scope + query)}`;
 }
 
@@ -187,16 +359,17 @@ browser.omnibox.setDefaultSuggestion({
 });
 
 browser.omnibox.onInputStarted.addListener(() => {
+  measureWindow();
   refreshIfStale();
 });
 
 browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
   const seq = ++inputSeq;
   const query = text.trim().toLowerCase();
-  const [cache, config, stored] = await Promise.all([
+  const [cache, stored] = await Promise.all([
     getCache(),
-    getConfig(),
-    browser.storage.local.get(STATUS_KEY)
+    browser.storage.local.get(STATUS_KEY),
+    windowWidth === null ? measureWindow() : null
   ]);
   if (seq !== inputSeq) return;
 
@@ -204,7 +377,7 @@ browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
 
   if (status.error && !cache.repos.length) {
     browser.omnibox.setDefaultSuggestion({
-      description: escapeXml(status.error)
+      description: status.error
     });
     suggest([]);
     return;
@@ -218,8 +391,9 @@ browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
     return;
   }
 
+  const typed = text.trim();
   browser.omnibox.setDefaultSuggestion({
-    description: `Search GitHub for <match>${escapeXml(text)}</match>`
+    description: PATH_RE.test(typed) ? `Open github.com/${typed}` : `Search GitHub for ${typed}`
   });
 
   const scored = [];
@@ -229,28 +403,26 @@ browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
   }
   scored.sort((a, b) => b.value - a.value || b.repo.pushedAt - a.repo.pushedAt);
 
-  const results = scored
-    .slice(0, MAX_SUGGESTIONS)
-    .map(({ repo }) => ({ content: repo.url, description: describe(repo) }));
+  const top = scored.slice(0, MAX_SUGGESTIONS).map(({ repo }) => repo);
+  const nameCount = new Map();
+  for (const repo of top) nameCount.set(repo.name, (nameCount.get(repo.name) || 0) + 1);
 
-  if (query.includes("/") && !results.length) {
-    results.push({
-      content: `https://github.com/${text.trim()}`,
-      description: `Open <match>github.com/${escapeXml(text.trim())}</match>`
-    });
-  }
+  links = new Map();
+  const results = top.map((repo) => {
+    const content = nameCount.get(repo.name) === 1 ? repo.name : repo.fullName;
+    links.set(content, repo.url);
+    return { content, description: describe(repo) };
+  });
 
   if (seq === inputSeq) suggest(results);
 });
 
 browser.omnibox.onInputEntered.addListener(async (text, disposition) => {
   const trimmed = text.trim();
-  let url;
-  if (trimmed.startsWith("https://")) {
-    url = trimmed;
-  } else {
-    const { orgs } = await getConfig();
-    url = searchUrl(trimmed, orgs);
+  let url = resolveLink(trimmed);
+  if (!url) {
+    const [{ orgs }, cache] = await Promise.all([getConfig(), getCache()]);
+    url = searchUrl(trimmed, orgs, cache.kinds || {});
   }
 
   if (disposition === "newForegroundTab") await browser.tabs.create({ url });
@@ -264,8 +436,57 @@ browser.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === REFRESH_ALARM) refreshIfStale();
 });
 
+async function syncCapture() {
+  const granted = await browser.permissions.contains({ origins: [CAPTURE_ORIGIN] });
+  const registered = await browser.scripting.getRegisteredContentScripts({ ids: [CAPTURE_ID] });
+
+  if (granted && !registered.length) {
+    await browser.scripting.registerContentScripts([
+      {
+        id: CAPTURE_ID,
+        matches: [CAPTURE_ORIGIN],
+        js: ["capture.js"],
+        runAt: "document_idle",
+        persistAcrossSessions: true
+      }
+    ]);
+  } else if (!granted && registered.length) {
+    await browser.scripting.unregisterContentScripts({ ids: [CAPTURE_ID] });
+  }
+}
+
+browser.permissions.onAdded.addListener(syncCapture);
+browser.permissions.onRemoved.addListener(syncCapture);
+syncCapture();
+
+async function fetchResult() {
+  try {
+    const cache = await refreshRepos();
+    return { ok: true, count: cache.repos.length, fetchedAt: cache.fetchedAt };
+  } catch (err) {
+    return {
+      ok: false,
+      error: String(err.message || err),
+      actionUrl: err.actionUrl || null,
+      actionLabel: err.actionLabel || null,
+      actionMessage: err.actionMessage || null
+    };
+  }
+}
+
 browser.runtime.onMessage.addListener(async (message) => {
-  if (message?.type !== "refresh") return;
-  const cache = await refreshRepos();
-  return { count: cache.repos.length, fetchedAt: cache.fetchedAt };
+  if (message?.type === "openOptions") {
+    await browser.runtime.openOptionsPage();
+    return { ok: true };
+  }
+
+  if (message?.type === "refresh") return fetchResult();
+
+  if (message?.type === "token") {
+    const config = await getConfig();
+    await browser.storage.local.set({
+      [CONFIG_KEY]: { ...config, token: message.token }
+    });
+    return { ...(await fetchResult()), saved: true };
+  }
 });

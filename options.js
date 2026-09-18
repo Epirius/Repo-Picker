@@ -1,27 +1,33 @@
 const CONFIG_KEY = "config";
 const CACHE_KEY = "repoCache";
 const ORIGINS = { origins: ["https://api.github.com/*"] };
+const CAPTURE = { origins: ["https://github.com/settings/*"] };
 
 const orgsEl = document.getElementById("orgs");
 const tokenEl = document.getElementById("token");
 const personalEl = document.getElementById("personal");
+const captureEl = document.getElementById("capture");
+const starredEl = document.getElementById("starred");
+const followingEl = document.getElementById("following");
 const saveEl = document.getElementById("save");
 const refreshEl = document.getElementById("refresh");
 const statusEl = document.getElementById("status");
 
+let persistTimer = null;
+
 document.getElementById("keyword").textContent =
   browser.runtime.getManifest().omnibox.keyword;
 
-function say(text, kind = "") {
+function say(text, kind = "", action = null) {
   statusEl.textContent = text;
   statusEl.className = kind;
-}
-
-function parseOrgs(text) {
-  return text
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  if (!action?.url) return;
+  const link = document.createElement("a");
+  link.href = action.url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = action.label || "Fix this";
+  statusEl.append(" ", link);
 }
 
 async function showCacheState() {
@@ -41,8 +47,20 @@ async function load() {
   orgsEl.value = (config.orgs || []).join("\n");
   tokenEl.value = config.token || "";
   personalEl.checked = Boolean(config.includePersonal);
+  starredEl.checked = Boolean(config.includeStarred);
+  followingEl.checked = Boolean(config.includeFollowing);
+  captureEl.checked = await browser.permissions.contains(CAPTURE);
   await showCacheState();
 }
+
+captureEl.addEventListener("change", async () => {
+  if (captureEl.checked) {
+    captureEl.checked = await browser.permissions.request(CAPTURE);
+    if (!captureEl.checked) say("Access to the GitHub settings page was declined.", "error");
+  } else {
+    await browser.permissions.remove(CAPTURE);
+  }
+});
 
 async function fetchNow() {
   saveEl.disabled = true;
@@ -50,8 +68,12 @@ async function fetchNow() {
   say("Fetching...");
   try {
     const result = await browser.runtime.sendMessage({ type: "refresh" });
-    const when = new Date(result.fetchedAt).toLocaleString();
-    say(`${result.count} repositories cached, last fetched ${when}.`, "ok");
+    if (result.ok) {
+      const when = new Date(result.fetchedAt).toLocaleString();
+      say(`${result.count} repositories cached, last fetched ${when}.`, "ok");
+    } else {
+      say(result.error, "error", { url: result.actionUrl, label: result.actionLabel });
+    }
   } catch (err) {
     say(String(err.message || err), "error");
   } finally {
@@ -60,12 +82,34 @@ async function fetchNow() {
   }
 }
 
+async function persist() {
+  clearTimeout(persistTimer);
+  const stored = await browser.storage.local.get(CONFIG_KEY);
+  await browser.storage.local.set({
+    [CONFIG_KEY]: {
+      ...(stored[CONFIG_KEY] || {}),
+      orgs: parseOrgs(orgsEl.value),
+      token: tokenEl.value.trim(),
+      includePersonal: personalEl.checked,
+      includeStarred: starredEl.checked,
+      includeFollowing: followingEl.checked
+    }
+  });
+}
+
+function persistSoon() {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(persist, 300);
+}
+
+orgsEl.addEventListener("input", persistSoon);
+tokenEl.addEventListener("input", persistSoon);
+personalEl.addEventListener("change", persistSoon);
+starredEl.addEventListener("change", persistSoon);
+followingEl.addEventListener("change", persistSoon);
+
 saveEl.addEventListener("click", async () => {
-  const config = {
-    orgs: parseOrgs(orgsEl.value),
-    token: tokenEl.value.trim(),
-    includePersonal: personalEl.checked
-  };
+  await persist();
 
   if (!(await browser.permissions.contains(ORIGINS))) {
     const granted = await browser.permissions.request(ORIGINS);
@@ -75,11 +119,19 @@ saveEl.addEventListener("click", async () => {
     }
   }
 
-  await browser.storage.local.set({ [CONFIG_KEY]: config });
-  orgsEl.value = config.orgs.join("\n");
+  orgsEl.value = parseOrgs(orgsEl.value).join("\n");
   await fetchNow();
 });
 
 refreshEl.addEventListener("click", fetchNow);
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  const nextToken = changes[CONFIG_KEY]?.newValue?.token;
+  if (nextToken !== undefined && nextToken !== tokenEl.value && document.activeElement !== tokenEl) {
+    tokenEl.value = nextToken || "";
+  }
+  if (changes[CACHE_KEY]) showCacheState();
+});
 
 load();

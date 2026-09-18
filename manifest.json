@@ -1,24 +1,47 @@
 {
   "manifest_version": 3,
-  "name": "GitHub repo omnibox",
-  "version": "1.0.0",
+  "name": "Repo Picker",
+  "version": "1.0.13",
   "description": "Type gh in the address bar, then a repo name, to jump straight to it.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "gh-omnibox@extension",
+      "id": "repo-picker@extension",
       "strict_min_version": "128.0"
     }
   },
-  "permissions": ["storage", "alarms"],
-  "host_permissions": ["https://api.github.com/*"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://api.github.com/*"
+  ],
+  "optional_host_permissions": [
+    "https://github.com/settings/*"
+  ],
   "omnibox": {
     "keyword": "gh"
   },
   "background": {
-    "scripts": ["background.js"]
+    "scripts": [
+      "background.js"
+    ]
   },
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
+  },
+  "action": {
+    "default_title": "Repo Picker",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.svg",
+      "32": "icon.svg"
+    }
+  },
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg"
   }
 }
