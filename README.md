@@ -1,6 +1,6 @@
 # Repo Picker
 
-A Firefox address bar keyword that autocompletes repository names.
+A browser address bar keyword that autocompletes repository names.
 
 Type `gh`, press space, then start typing. Matching repos appear in the dropdown.
 Arrow down, Enter, you are on the repo. Enter without picking anything runs a GitHub
@@ -20,7 +20,7 @@ That rewrites `manifest.json`, bumps the patch version and rebuilds `repo-picker
 it with no argument to print the current keyword. Then reload: hit Reload in
 `about:debugging` for a temporary install, or re-sign the zip for a permanent one.
 
-Firefox has no way to do this from inside the browser. The keyword is fixed in the
+There is no way to do this from inside the browser. The keyword is fixed in the
 manifest, `browser.omnibox` has no method to change it, and there is no preferences UI
 for extension keywords. The open request for one is
 [bug 1361327](https://bugzilla.mozilla.org/show_bug.cgi?id=1361327). Editing the file and
@@ -28,7 +28,7 @@ reloading is the whole story.
 
 ## What a row shows
 
-The repo name comes first, because Firefox bolds whatever you typed and that is where you
+The repo name comes first, because the browser bolds whatever you typed and that is where you
 want the bold to land. Everything after it drops away as the window narrows:
 
 | Window width | Row |
@@ -41,12 +41,12 @@ Width comes from `browser.windows.getCurrent()`, read once when you open the dro
 The two thresholds are `OWNER_MIN_PX` and `DESCRIPTION_MIN_PX` at the top of
 `background.js`. Setting either absurdly high turns that column off for good.
 
-Firefox also draws the suggestion's `content` on the right, and gives it the space it
+The browser also draws the suggestion's `content` on the right, and gives it the space it
 wants before truncating the description. So `content` is `ledger-api` rather than the full
 URL, and `onInputEntered` maps it back. A bare name is used when it is unique among the
 visible rows, `org/name` when two orgs have the same repo name.
 
-Firefox renders `description` as plain text. Chrome's `<match>` and `<dim>` markup shows up
+The browser renders `description` as plain text. Chrome's `<match>` and `<dim>` markup shows up
 literally, so there is none here, and there is no way to bold anything yourself.
 
 ## What gets indexed
@@ -101,12 +101,12 @@ to the bottom. Ties break toward the most recently pushed repo.
 2. Load Temporary Add-on, pick `manifest.json` from this folder
 3. The options page opens from `about:addons` under this extension's Preferences
 
-This version disappears when Firefox restarts.
+This version disappears when the browser restarts.
 
 ### Keep it
 
-Firefox release builds refuse unsigned extensions, so a permanent install means getting
-it signed. Signing is free and an unlisted add-on skips review.
+Release builds refuse unsigned extensions, so a permanent install means getting it
+signed. Signing is free and an unlisted add-on skips review.
 
 1. `python3 build.py`
 2. Go to https://addons.mozilla.org/developers/addon/submit/distribution
@@ -116,14 +116,14 @@ it signed. Signing is free and an unlisted add-on skips review.
 
 Changing the extension means bumping `version` in `manifest.json` and repeating that.
 
-The alternative is Firefox Developer Edition, Nightly or ESR, where setting
+The alternative is a developer, nightly or ESR build, where setting
 `xpinstall.signatures.required` to `false` in `about:config` lets an unsigned add-on
 install permanently. The pref does nothing on release builds.
 
 ## Releasing
 
 `build.py` copies the packaged files into `dist/` and zips them. The tests, this README
-and the workflow stay out of the build, so what Firefox loads is only what it runs.
+and the workflow stay out of the build, so what the browser loads is only what it runs.
 
 `run-tests.js` runs every harness under Node, which is how CI runs them. On a Mac they
 also run one at a time under Safari's engine, `jsc test-orgs.js`, which needs nothing
@@ -193,7 +193,7 @@ was last saved rather than what is on screen, and a first run fails with no orga
 set. Save and fetch still does the explicit fetch.
 
 The options page has a checkbox for capturing tokens from the GitHub settings page. Tick
-it and Firefox asks for access to `github.com/settings/*`. A content script then watches
+it and the browser asks for access to `github.com/settings/*`. A content script then watches
 that page for a freshly generated token and shows a bar offering to save it.
 
 It is off by default and the permission is optional, so nothing is registered until you
@@ -206,7 +206,7 @@ full value GitHub shows you once, right after creation.
 
 ### Storage
 
-The token sits in `browser.storage.local` for this profile, as plain text. Firefox offers
+The token sits in `browser.storage.local` for this profile, as plain text. The browser offers
 extensions no encrypted storage and no route to the OS keychain, so that file in the
 profile folder is the only place to put it, and any program running as the same user can
 read it. The options page says so rather than leaving people to assume otherwise.
@@ -237,7 +237,7 @@ produce without compromising GitHub itself.
 
 ## Files
 
-- `manifest.json` permissions, the keyword, the Firefox extension id
+- `manifest.json` permissions, the keyword, the extension id
 - `background.js` fetching, caching, scoring, the omnibox handlers
 - `options.html` / `options.js` org list, token, manual refresh
 - `capture.js` optional content script that offers to save a new token
