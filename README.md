@@ -125,6 +125,9 @@ install permanently. The pref does nothing on release builds.
 `build.py` copies the packaged files into `dist/` and zips them. The tests and this README
 stay out of the build, so what Firefox loads is only what it runs.
 
+`run-tests.js` runs every harness under Node. On a Mac they also run one at a time under
+Safari's engine, `jsc test-orgs.js`, which needs nothing installed.
+
 ## Token
 
 Prefer a fine-grained token. Resource owner set to the organization, then
@@ -222,3 +225,4 @@ produce without compromising GitHub itself.
 - `expiry.js` parses the expiry header and phrases the warning
 - `build.py` copies the packaged files into `dist/` and zips them
 - `set-keyword.py` rewrites the keyword and repackages
+- `run-tests.js` runs the test harnesses under Node
