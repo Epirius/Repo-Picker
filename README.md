@@ -1,4 +1,4 @@
-# GitHub repo omnibox
+# Repo Picker
 
 A Firefox address bar keyword that autocompletes repository names.
 
@@ -16,7 +16,7 @@ keystroke.
 ./set-keyword.py repo
 ```
 
-That rewrites `manifest.json`, bumps the patch version and rebuilds `gh-omnibox.zip`. Run
+That rewrites `manifest.json`, bumps the patch version and rebuilds `repo-picker.zip`. Run
 it with no argument to print the current keyword. Then reload: hit Reload in
 `about:debugging` for a temporary install, or re-sign the zip for a permanent one.
 
@@ -25,6 +25,67 @@ manifest, `browser.omnibox` has no method to change it, and there is no preferen
 for extension keywords. The open request for one is
 [bug 1361327](https://bugzilla.mozilla.org/show_bug.cgi?id=1361327). Editing the file and
 reloading is the whole story.
+
+## What a row shows
+
+The repo name comes first, because Firefox bolds whatever you typed and that is where you
+want the bold to land. Everything after it drops away as the window narrows:
+
+| Window width | Row |
+| --- | --- |
+| under 800px | `ledger-api` |
+| 800px and up | `ledger-api · acme` |
+| 1200px and up | `ledger-api · acme · description` |
+
+Width comes from `browser.windows.getCurrent()`, read once when you open the dropdown.
+The two thresholds are `OWNER_MIN_PX` and `DESCRIPTION_MIN_PX` at the top of
+`background.js`. Setting either absurdly high turns that column off for good.
+
+Firefox also draws the suggestion's `content` on the right, and gives it the space it
+wants before truncating the description. So `content` is `ledger-api` rather than the full
+URL, and `onInputEntered` maps it back. A bare name is used when it is unique among the
+visible rows, `org/name` when two orgs have the same repo name.
+
+Firefox renders `description` as plain text. Chrome's `<match>` and `<dim>` markup shows up
+literally, so there is none here, and there is no way to bold anything yourself.
+
+## What gets indexed
+
+Every repository you can read under the accounts listed on the options page, plus three
+independent toggles:
+
+- repositories you own or collaborate on, via `/user/repos`
+- repositories you have starred, via `/user/starred`
+- repositories owned by accounts you follow, via `/user/following` then `/users/{login}/repos`
+
+The last one costs one request per account you follow, capped at six in flight, so it is
+the slow one. An account that vanishes between the two calls is skipped instead of failing
+the run. Duplicates across sources collapse on full name.
+
+## The accounts field
+
+Entries separate on commas, newlines or both. Each one can be a bare name or any GitHub
+URL for it, so all of these mean the same account:
+
+```
+acme
+@acme
+github.com/acme
+https://github.com/acme
+https://github.com/orgs/acme/repositories
+https://github.com/acme/some-repo
+```
+
+Names are deduplicated case insensitively, and anything that is not a valid GitHub login
+is dropped rather than sent to the API.
+
+Organizations and users both work. A bare name does not say which it is, so indexing tries
+`/orgs/{name}/repos` first and falls back to `/users/{name}/repos` on a 404. Which one
+answered is remembered, so the fallback GitHub search built from Enter uses `org:` or
+`user:` correctly.
+
+Parsing lives in `orgs.js` rather than `options.js` so `test-orgs.js` can exercise it
+directly.
 
 ## Matching
 
@@ -47,7 +108,7 @@ This version disappears when Firefox restarts.
 Firefox release builds refuse unsigned extensions, so a permanent install means getting
 it signed. Signing is free and an unlisted add-on skips review.
 
-1. `zip -r -FS gh-omnibox.zip . -x '*.git*' 'gh-omnibox.zip'`
+1. `zip -r -FS repo-picker.zip . -x '*.git*' 'repo-picker.zip'`
 2. Go to https://addons.mozilla.org/developers/addon/submit/distribution
 3. Choose "On your own" for distribution, upload the zip
 4. Download the signed `.xpi`
@@ -61,15 +122,59 @@ install permanently. The pref does nothing on release builds.
 
 ## Token
 
-The options page takes either kind of GitHub token.
+Prefer a fine-grained token. Resource owner set to the organization, then
+`Repository permissions → Metadata → Read-only`, and nothing else. That one permission is
+what listing repositories needs, and it cannot write anything. Some orgs make an admin
+approve fine-grained tokens first.
 
-A fine-grained token needs `Metadata: read` and, importantly, the resource owner set to
-the organization rather than your own account. Some orgs require an admin to approve
-fine-grained tokens before they work.
+The classic button exists because that page can be prefilled:
 
-A classic token needs the `repo` scope. If the org uses SAML single sign-on, open the
-token's settings page afterwards and authorize it for that org, or the API returns the
-org's public repos only.
+```
+https://github.com/settings/tokens/new?description=Repo%20Picker&scopes=repo&default_expires_at=none
+```
+
+`description`, `scopes` (comma separated) and `default_expires_at` (a day count, or
+`none`) are prefill parameters GitHub supports there. The fine-grained page ignores them.
+
+### Why classic asks for so much
+
+`repo` is the only classic scope that lists private org repos, and GitHub documents it as
+"full access to public and private repositories including read and write access to code,
+commit statuses, repository invitations, collaborators, deployment statuses, and
+repository webhooks."
+
+The boxes that tick themselves underneath it, `repo:status`, `repo_deployment`,
+`public_repo`, `repo:invite` and `security_events`, are subsets of `repo`, not extras we
+ask for. Ticking the parent grants all of it and locks the children on. Untick `repo` and
+they become selectable, but none of them can list private repos, so the extension stops
+working. `public_repo` alone works if every repo you care about is public.
+
+There is no read-only classic scope for private repositories. That is the whole reason to
+use a fine-grained token here.
+
+### Single sign-on
+
+If the org uses SAML single sign-on, open the new token's page and authorize it for the
+org, or the API returns the org's public repos only.
+
+### Skipping the copy and paste
+
+The org list, token field and checkbox are written to storage as you type, not only when
+you click Save and fetch. Without that, creating a token in another tab picks up whatever
+was last saved rather than what is on screen, and a first run fails with no organization
+set. Save and fetch still does the explicit fetch.
+
+The options page has a checkbox for capturing tokens from the GitHub settings page. Tick
+it and Firefox asks for access to `github.com/settings/*`. A content script then watches
+that page for a freshly generated token and shows a bar offering to save it.
+
+It is off by default and the permission is optional, so nothing is registered until you
+ask for it. Untick the box and the content script is unregistered and the permission
+dropped. The prompt never stores anything until you click Save.
+
+The script matches on the token format, `ghp_` plus 36 characters or `github_pat_` plus
+82, so the truncated prefixes listed on the token index page do not trigger it. Only the
+full value GitHub shows you once, right after creation.
 
 The token sits in `browser.storage.local` for this profile. It never leaves the browser
 except in requests to `api.github.com`.
@@ -79,4 +184,5 @@ except in requests to `api.github.com`.
 - `manifest.json` permissions, the keyword, the Firefox extension id
 - `background.js` fetching, caching, scoring, the omnibox handlers
 - `options.html` / `options.js` org list, token, manual refresh
+- `capture.js` optional content script that offers to save a new token
 - `set-keyword.py` rewrites the keyword and repackages
