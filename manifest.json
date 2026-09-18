@@ -23,6 +23,7 @@
   "background": {
     "scripts": [
       "https-url.js",
+      "expiry.js",
       "background.js"
     ]
   },

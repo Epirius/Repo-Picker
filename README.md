@@ -176,8 +176,17 @@ The script matches on the token format, `ghp_` plus 36 characters or `github_pat
 82, so the truncated prefixes listed on the token index page do not trigger it. Only the
 full value GitHub shows you once, right after creation.
 
-The token sits in `browser.storage.local` for this profile. It never leaves the browser
-except in requests to `api.github.com`. Pagination follows the `Link` header, so that
+### Expiry
+
+Every authenticated response carries `GitHub-Authentication-Token-Expiration` when the
+token has an expiry date. That date is stored with the index, shown on the options page,
+and shown in the popup once it is within a fortnight. A refresh with a date already past
+fails before making a request, saying when it expired. Changing the token clears the
+remembered date, so a fresh token is never judged by the old one's deadline.
+
+### Where the token can be sent
+
+The token leaves the browser only in requests to `api.github.com`. Pagination follows the `Link` header, so that
 header is checked against the API host before the next request carries the token, and a
 GitHub response that suggests a link for the user to click can only produce an `https:`
 one. Both guards assume a hostile response, which is what a TLS-intercepting proxy can
@@ -190,4 +199,5 @@ produce without compromising GitHub itself.
 - `options.html` / `options.js` org list, token, manual refresh
 - `capture.js` optional content script that offers to save a new token
 - `https-url.js` the scheme check shared by every page that renders a link
+- `expiry.js` parses the expiry header and phrases the warning
 - `set-keyword.py` rewrites the keyword and repackages

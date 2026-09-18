@@ -12,7 +12,8 @@ HERE = pathlib.Path(__file__).resolve().parent
 MANIFEST = HERE / "manifest.json"
 ZIP_NAME = "repo-picker.zip"
 PACKAGED = ["manifest.json", "background.js", "options.html", "options.js", "capture.js",
-            "popup.html", "popup.js", "icon.svg", "orgs.js", "https-url.js"]
+            "popup.html", "popup.js", "icon.svg", "orgs.js", "https-url.js",
+            "expiry.js"]
 VALID = re.compile(r"^[^\s\"'<>]+$")
 DESCRIPTION = "Type {kw} in the address bar, then a repo name, to jump straight to it."
 

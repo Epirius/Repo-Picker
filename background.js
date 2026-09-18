@@ -18,6 +18,7 @@ let inFlight = null;
 let inputSeq = 0;
 let windowWidth = null;
 let links = new Map();
+let tokenExpiry = 0;
 
 async function getConfig() {
   const stored = await browser.storage.local.get(CONFIG_KEY);
@@ -36,6 +37,11 @@ async function getCache() {
   const stored = await browser.storage.local.get(CACHE_KEY);
   memo = stored[CACHE_KEY] || { repos: [], fetchedAt: 0, kinds: {} };
   return memo;
+}
+
+async function getStatus() {
+  const stored = await browser.storage.local.get(STATUS_KEY);
+  return stored[STATUS_KEY] || {};
 }
 
 async function setStatus(fields) {
@@ -152,6 +158,7 @@ async function fetchPaged(url, token) {
       );
     }
     if (!res.ok) throw await githubError(res, next);
+    tokenExpiry = parseExpiry(res.headers.get("GitHub-Authentication-Token-Expiration")) || tokenExpiry;
     out.push(...(await res.json()));
     next = nextPageUrl(res.headers.get("Link"));
   }
@@ -206,6 +213,12 @@ async function refreshRepos() {
   inFlight = (async () => {
     const { orgs, token, includePersonal, includeStarred, includeFollowing } = await getConfig();
     if (!token) throw configError("No access token saved yet.");
+
+    const { tokenExpiresAt } = await getStatus();
+    if (tokenExpiresAt && tokenExpiresAt <= Date.now()) {
+      throw configError(expiryNote(tokenExpiresAt));
+    }
+    tokenExpiry = 0;
     if (!orgs.length && !includePersonal && !includeStarred && !includeFollowing) {
       throw configError(
         "No organization saved yet. Add one in the options page, then click Save and fetch."
@@ -251,6 +264,7 @@ async function refreshRepos() {
     await setStatus({
       count: repos.length,
       fetchedAt: memo.fetchedAt,
+      tokenExpiresAt: tokenExpiry || null,
       error: null,
       actionUrl: null,
       actionLabel: null,
@@ -490,6 +504,14 @@ async function syncCapture() {
 browser.permissions.onAdded.addListener(syncCapture);
 browser.permissions.onRemoved.addListener(syncCapture);
 syncCapture();
+
+browser.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== "local" || !changes[CONFIG_KEY]) return;
+  const { oldValue, newValue } = changes[CONFIG_KEY];
+  if (oldValue?.token === newValue?.token) return;
+  tokenExpiry = 0;
+  await setStatus({ tokenExpiresAt: null });
+});
 
 browser.runtime.onMessage.addListener(async (message) => {
   if (message?.type === "openOptions") {

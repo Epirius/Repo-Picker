@@ -11,12 +11,21 @@ const config = {
 };
 
 const requested = [];
+const store = { config };
+const EXPIRES = "2027-03-18 15:00:00 UTC";
 
 globalThis.browser = {
   storage: {
     local: {
-      get: (key) => resolve(key === "config" ? { config } : {}),
-      set: () => resolve()
+      get: (key) => {
+        const out = {};
+        for (const k of [].concat(key)) if (k in store) out[k] = store[k];
+        return resolve(out);
+      },
+      set: (values) => {
+        Object.assign(store, values);
+        return resolve();
+      }
     },
     onChanged: listener
   },
@@ -71,11 +80,14 @@ globalThis.fetch = (url) => {
     status: 200,
     json: () => Promise.resolve(body),
     text: () => Promise.resolve(JSON.stringify(body)),
-    headers: { get: () => null }
+    headers: {
+      get: (name) => (name === "GitHub-Authentication-Token-Expiration" ? EXPIRES : null)
+    }
   });
 };
 
 load("https-url.js");
+load("expiry.js");
 load("background.js");
 
 (async () => {
@@ -91,4 +103,17 @@ load("background.js");
   print("");
   print("resolved kinds: " + JSON.stringify(cache.kinds));
   print("search scope: " + searchUrl("thing", ["acme", "octocat"], cache.kinds));
+  print("");
+  print(`token expiry read from the header: ${store.status.tokenExpiresAt === Date.parse("2027-03-18T15:00:00Z")}`);
+
+  store.status.tokenExpiresAt = Date.now() - 24 * 60 * 60 * 1000;
+  requested.length = 0;
+  try {
+    await refreshRepos();
+    print("expired token: FAIL, the refresh went ahead");
+  } catch (err) {
+    print(`expired token: ${err.message}`);
+    print(`  requests made: ${requested.length}`);
+    print(`  action: ${err.actionLabel} -> sends {type: "${err.actionMessage}"}`);
+  }
 })();

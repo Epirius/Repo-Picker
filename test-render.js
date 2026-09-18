@@ -3,7 +3,7 @@ const listener = { addListener: noop };
 const resolve = (value) => Promise.resolve(value);
 
 globalThis.browser = {
-  storage: { local: { get: () => resolve({}), set: () => resolve() } },
+  storage: { local: { get: () => resolve({}), set: () => resolve() }, onChanged: listener },
   omnibox: {
     setDefaultSuggestion: noop,
     onInputStarted: listener,
@@ -24,6 +24,7 @@ globalThis.browser = {
 };
 
 load("https-url.js");
+load("expiry.js");
 load("background.js");
 
 const owner = "acme";

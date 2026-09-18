@@ -1,5 +1,6 @@
 const CONFIG_KEY = "config";
 const CACHE_KEY = "repoCache";
+const STATUS_KEY = "status";
 const CLASSIC_URL = "https://github.com/settings/tokens/new?description=Repo%20Picker&scopes=repo";
 const TOKEN_MONTHS = 6;
 const ORIGINS = { origins: ["https://api.github.com/*"] };
@@ -43,14 +44,19 @@ function say(text, kind = "", action = null) {
 }
 
 async function showCacheState() {
-  const stored = await browser.storage.local.get(CACHE_KEY);
+  const stored = await browser.storage.local.get([CACHE_KEY, STATUS_KEY]);
   const cache = stored[CACHE_KEY];
+  const expiresAt = stored[STATUS_KEY]?.tokenExpiresAt;
+  const expired = Boolean(expiresAt) && expiresAt <= Date.now();
+  const note = expiryNote(expiresAt);
+
   if (!cache?.repos?.length) {
-    say("Nothing cached yet.");
+    say(["Nothing cached yet.", note].filter(Boolean).join(" "), expired ? "error" : "");
     return;
   }
   const when = new Date(cache.fetchedAt).toLocaleString();
-  say(`${cache.repos.length} repositories cached, last fetched ${when}.`, "ok");
+  const count = `${cache.repos.length} repositories cached, last fetched ${when}.`;
+  say([count, note].filter(Boolean).join(" "), expired ? "error" : "ok");
 }
 
 async function load() {
@@ -81,8 +87,7 @@ async function fetchNow() {
   try {
     const result = await browser.runtime.sendMessage({ type: "refresh" });
     if (result.ok) {
-      const when = new Date(result.fetchedAt).toLocaleString();
-      say(`${result.count} repositories cached, last fetched ${when}.`, "ok");
+      await showCacheState();
     } else {
       say(result.error, "error", { url: result.actionUrl, label: result.actionLabel });
     }

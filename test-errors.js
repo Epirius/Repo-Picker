@@ -24,6 +24,7 @@ globalThis.browser = {
 };
 
 load("https-url.js");
+load("expiry.js");
 load("background.js");
 
 function fakeResponse(status, body, headers = {}) {

@@ -31,7 +31,10 @@ async function show() {
     say(status.error, "error", { url: status.actionUrl, label: status.actionLabel });
     return;
   }
-  say(describeCache(stored[CACHE_KEY]));
+  const expiresAt = status.tokenExpiresAt;
+  const note = expiringSoon(expiresAt) ? expiryNote(expiresAt) : "";
+  const expired = Boolean(expiresAt) && expiresAt <= Date.now();
+  say([describeCache(stored[CACHE_KEY]), note].filter(Boolean).join(" "), expired ? "error" : "");
 }
 
 reindexEl.addEventListener("click", async () => {
