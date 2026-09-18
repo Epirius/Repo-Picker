@@ -5,10 +5,16 @@ const STATUS_KEY = "status";
 const REFRESH_ALARM = "refresh-repos";
 const STALE_MS = 6 * 60 * 60 * 1000;
 const MAX_SUGGESTIONS = 8;
+const OWNER_MIN_PX = 800;
+const DESCRIPTION_MIN_PX = 1200;
+const SEPARATOR = " · ";
+const PATH_RE = /^[^\s/]+\/[^\s/]+$/;
 
 let memo = null;
 let inFlight = null;
 let inputSeq = 0;
+let windowWidth = null;
+let links = new Map();
 
 async function getConfig() {
   const stored = await browser.storage.local.get(CONFIG_KEY);
@@ -87,6 +93,7 @@ async function refreshRepos() {
     for (const repo of pages.flat()) {
       byFullName.set(repo.full_name, {
         name: repo.name,
+        owner: repo.owner?.login || repo.full_name.split("/")[0],
         fullName: repo.full_name,
         url: repo.html_url,
         description: repo.description || "",
@@ -163,18 +170,38 @@ function score(repo, query) {
   return value;
 }
 
-function escapeXml(text) {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+async function measureWindow() {
+  try {
+    const win = await browser.windows.getCurrent();
+    if (win?.width) windowWidth = win.width;
+  } catch {
+    windowWidth = null;
+  }
+}
+
+function clip(text, limit) {
+  const tidy = text.replace(/\s+/g, " ").trim();
+  return tidy.length > limit ? `${tidy.slice(0, limit - 1)}…` : tidy;
 }
 
 function describe(repo) {
-  const suffix = repo.archived ? " (archived)" : "";
-  const tail = repo.description ? ` ${repo.description.slice(0, 90)}` : "";
-  return `<match>${escapeXml(repo.fullName + suffix)}</match><dim>${escapeXml(tail)}</dim>`;
+  const width = windowWidth ?? DESCRIPTION_MIN_PX;
+  const parts = [repo.archived ? `${repo.name} (archived)` : repo.name];
+
+  if (width >= OWNER_MIN_PX) {
+    parts.push(repo.owner || repo.fullName.split("/")[0]);
+  }
+  if (width >= DESCRIPTION_MIN_PX && repo.description) {
+    parts.push(clip(repo.description, 80));
+  }
+  return parts.join(SEPARATOR);
+}
+
+function resolveLink(text) {
+  if (links.has(text)) return links.get(text);
+  if (text.startsWith("https://")) return text;
+  if (PATH_RE.test(text)) return `https://github.com/${text}`;
+  return null;
 }
 
 function searchUrl(query, orgs) {
@@ -187,16 +214,17 @@ browser.omnibox.setDefaultSuggestion({
 });
 
 browser.omnibox.onInputStarted.addListener(() => {
+  measureWindow();
   refreshIfStale();
 });
 
 browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
   const seq = ++inputSeq;
   const query = text.trim().toLowerCase();
-  const [cache, config, stored] = await Promise.all([
+  const [cache, stored] = await Promise.all([
     getCache(),
-    getConfig(),
-    browser.storage.local.get(STATUS_KEY)
+    browser.storage.local.get(STATUS_KEY),
+    windowWidth === null ? measureWindow() : null
   ]);
   if (seq !== inputSeq) return;
 
@@ -204,7 +232,7 @@ browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
 
   if (status.error && !cache.repos.length) {
     browser.omnibox.setDefaultSuggestion({
-      description: escapeXml(status.error)
+      description: status.error
     });
     suggest([]);
     return;
@@ -218,8 +246,9 @@ browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
     return;
   }
 
+  const typed = text.trim();
   browser.omnibox.setDefaultSuggestion({
-    description: `Search GitHub for <match>${escapeXml(text)}</match>`
+    description: PATH_RE.test(typed) ? `Open github.com/${typed}` : `Search GitHub for ${typed}`
   });
 
   const scored = [];
@@ -229,26 +258,24 @@ browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
   }
   scored.sort((a, b) => b.value - a.value || b.repo.pushedAt - a.repo.pushedAt);
 
-  const results = scored
-    .slice(0, MAX_SUGGESTIONS)
-    .map(({ repo }) => ({ content: repo.url, description: describe(repo) }));
+  const top = scored.slice(0, MAX_SUGGESTIONS).map(({ repo }) => repo);
+  const nameCount = new Map();
+  for (const repo of top) nameCount.set(repo.name, (nameCount.get(repo.name) || 0) + 1);
 
-  if (query.includes("/") && !results.length) {
-    results.push({
-      content: `https://github.com/${text.trim()}`,
-      description: `Open <match>github.com/${escapeXml(text.trim())}</match>`
-    });
-  }
+  links = new Map();
+  const results = top.map((repo) => {
+    const content = nameCount.get(repo.name) === 1 ? repo.name : repo.fullName;
+    links.set(content, repo.url);
+    return { content, description: describe(repo) };
+  });
 
   if (seq === inputSeq) suggest(results);
 });
 
 browser.omnibox.onInputEntered.addListener(async (text, disposition) => {
   const trimmed = text.trim();
-  let url;
-  if (trimmed.startsWith("https://")) {
-    url = trimmed;
-  } else {
+  let url = resolveLink(trimmed);
+  if (!url) {
     const { orgs } = await getConfig();
     url = searchUrl(trimmed, orgs);
   }
