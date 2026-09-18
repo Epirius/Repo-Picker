@@ -91,7 +91,8 @@
         align-items: center;
         margin-top: 24px;
       }
-      button {
+      button,
+      a.button {
         font: inherit;
         font-weight: 600;
         padding: 8px 16px;
@@ -100,11 +101,27 @@
         background: var(--field);
         color: var(--fg);
         cursor: pointer;
+        display: inline-block;
+        text-decoration: none;
       }
-      button.primary {
+      .row.tight {
+        margin-top: 10px;
+      }
+      a {
+        color: var(--accent);
+      }
+      button.primary,
+      a.button.primary {
         background: var(--accent);
         border-color: var(--accent);
         color: var(--bg);
+      }
+      h2.sub {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+        margin: 20px 0 6px;
       }
       button:disabled {
         opacity: 0.55;
@@ -147,10 +164,50 @@
       <div class="field">
         <label for="token">Access token</label>
         <input id="token" type="password" spellcheck="false" autocomplete="off" />
+        <div class="row tight">
+          <a
+            class="button primary"
+            id="new-fine"
+            href="https://github.com/settings/personal-access-tokens/new"
+            target="_blank"
+            rel="noopener"
+            >Create a fine-grained token</a
+          >
+          <a
+            class="button"
+            id="new-classic"
+            href="https://github.com/settings/tokens/new?description=GitHub%20repo%20omnibox&amp;scopes=repo&amp;default_expires_at=none"
+            target="_blank"
+            rel="noopener"
+            >Classic token</a
+          >
+        </div>
+        <h2 class="sub">Fine-grained</h2>
         <p class="hint">
-          A fine-grained token with <em>Metadata: read</em> on the orgs, or a classic token with the
-          <code>repo</code> scope. Stored in this browser profile only.
+          Reach for this one first. Set the resource owner to your organization and grant a single
+          permission, <em>Repository permissions → Metadata → Read-only</em>. That is precisely what
+          listing repositories needs, and a token holding it can change nothing.
         </p>
+        <p class="hint">
+          Two things get in the way. Plenty of organizations require an admin to approve every
+          fine-grained token, so you may be waiting. And GitHub ignores prefill parameters on that
+          page, so you fill the form in by hand.
+        </p>
+
+        <h2 class="sub">Classic</h2>
+        <p class="hint">
+          Reach for this when the other one is blocked: your org has not enabled fine-grained
+          tokens, approval would take days, or you want this working in the next minute. The button
+          fills the form in for you, so it is two clicks.
+        </p>
+        <p class="hint">
+          The price is the <code>repo</code> scope, which also grants write access to every
+          repository you can reach. For something that only reads names, that is far too much, and
+          GitHub offers nothing narrower that can see private repositories. The scopes listed
+          underneath it are locked on rather than optional.
+        </p>
+
+        <p class="hint">Either token is stored in this browser profile and nowhere else.</p>
       </div>
 
       <div class="field check">
