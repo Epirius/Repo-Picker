@@ -160,9 +160,13 @@
       </p>
 
       <div class="field">
-        <label for="orgs">Organizations</label>
-        <textarea id="orgs" spellcheck="false" placeholder="one per line"></textarea>
-        <p class="hint">Every repository you can read in these orgs gets indexed.</p>
+        <label for="orgs">Organizations and users</label>
+        <textarea id="orgs" spellcheck="false" placeholder="one per line, or comma separated"></textarea>
+        <p class="hint">
+          Every repository you can read under these accounts gets indexed. Organizations and
+          users both work, and so does a full URL, so <code>https://github.com/acme</code> and
+          <code>acme</code> are the same thing.
+        </p>
       </div>
 
       <div class="field">
@@ -248,6 +252,7 @@
 
       <p id="status"></p>
     </main>
+    <script src="orgs.js"></script>
     <script src="options.js"></script>
   </body>
 </html>

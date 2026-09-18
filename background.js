@@ -33,7 +33,7 @@ async function getConfig() {
 async function getCache() {
   if (memo) return memo;
   const stored = await browser.storage.local.get(CACHE_KEY);
-  memo = stored[CACHE_KEY] || { repos: [], fetchedAt: 0 };
+  memo = stored[CACHE_KEY] || { repos: [], fetchedAt: 0, kinds: {} };
   return memo;
 }
 
@@ -58,6 +58,7 @@ class GitHubError extends Error {
     super(message);
     this.actionUrl = actionUrl || null;
     this.actionLabel = actionLabel || null;
+    this.status = 0;
   }
 }
 
@@ -69,10 +70,16 @@ function configError(message) {
 }
 
 function orgFromUrl(url) {
-  return decodeURIComponent(url.match(/\/orgs\/([^/?]+)/)?.[1] || "");
+  return decodeURIComponent(url.match(/\/(?:orgs|users)\/([^/?]+)/)?.[1] || "");
 }
 
 async function githubError(res, url) {
+  const err = await describeFailure(res, url);
+  err.status = res.status;
+  return err;
+}
+
+async function describeFailure(res, url) {
   const body = await res.text();
   let message = body.slice(0, 200);
   try {
@@ -107,7 +114,7 @@ async function githubError(res, url) {
 
   if (res.status === 404 && org) {
     return new GitHubError(
-      `No organization named ${org}, or this token cannot see it. Check the spelling against the URL on GitHub.`
+      `No organization or user named ${org}, or this token cannot see it. Check the spelling against the URL on GitHub.`
     );
   }
 
@@ -164,6 +171,24 @@ async function followedRepos(token) {
   return out;
 }
 
+async function ownerRepos(name, token) {
+  const encoded = encodeURIComponent(name);
+  try {
+    return {
+      name,
+      kind: "org",
+      repos: await fetchPaged(`${API}/orgs/${encoded}/repos?per_page=100&type=all&sort=pushed`, token)
+    };
+  } catch (err) {
+    if (err.status !== 404) throw err;
+    return {
+      name,
+      kind: "user",
+      repos: await fetchPaged(`${API}/users/${encoded}/repos?per_page=100&type=owner&sort=pushed`, token)
+    };
+  }
+}
+
 async function refreshRepos() {
   if (inFlight) return inFlight;
   inFlight = (async () => {
@@ -175,10 +200,15 @@ async function refreshRepos() {
       );
     }
 
-    const urls = orgs.map(
-      (org) =>
-        `${API}/orgs/${encodeURIComponent(org)}/repos?per_page=100&type=all&sort=pushed`
-    );
+    const owners = await Promise.all(orgs.map((name) => ownerRepos(name, token)));
+    const kinds = {};
+    const found = [];
+    for (const owner of owners) {
+      kinds[owner.name.toLowerCase()] = owner.kind;
+      found.push(...owner.repos);
+    }
+
+    const urls = [];
     if (includePersonal) {
       urls.push(`${API}/user/repos?per_page=100&affiliation=owner,collaborator&sort=pushed`);
     }
@@ -187,7 +217,7 @@ async function refreshRepos() {
     }
 
     const pages = await Promise.all(urls.map((u) => fetchPaged(u, token)));
-    const found = pages.flat();
+    found.push(...pages.flat());
     if (includeFollowing) found.push(...(await followedRepos(token)));
 
     const byFullName = new Map();
@@ -204,7 +234,7 @@ async function refreshRepos() {
     }
 
     const repos = [...byFullName.values()].sort((a, b) => b.pushedAt - a.pushedAt);
-    memo = { repos, fetchedAt: Date.now() };
+    memo = { repos, fetchedAt: Date.now(), kinds };
     await browser.storage.local.set({ [CACHE_KEY]: memo });
     await setStatus({
       count: repos.length,
@@ -317,8 +347,10 @@ function resolveLink(text) {
   return null;
 }
 
-function searchUrl(query, orgs) {
-  const scope = orgs.length ? orgs.map((o) => `org:${o}`).join(" ") + " " : "";
+function searchUrl(query, orgs, kinds = {}) {
+  const scope = orgs.length
+    ? orgs.map((o) => `${kinds[o.toLowerCase()] === "user" ? "user" : "org"}:${o}`).join(" ") + " "
+    : "";
   return `https://github.com/search?type=repositories&q=${encodeURIComponent(scope + query)}`;
 }
 
@@ -389,8 +421,8 @@ browser.omnibox.onInputEntered.addListener(async (text, disposition) => {
   const trimmed = text.trim();
   let url = resolveLink(trimmed);
   if (!url) {
-    const { orgs } = await getConfig();
-    url = searchUrl(trimmed, orgs);
+    const [{ orgs }, cache] = await Promise.all([getConfig(), getCache()]);
+    url = searchUrl(trimmed, orgs, cache.kinds || {});
   }
 
   if (disposition === "newForegroundTab") await browser.tabs.create({ url });

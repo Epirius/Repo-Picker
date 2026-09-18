@@ -30,13 +30,6 @@ function say(text, kind = "", action = null) {
   statusEl.append(" ", link);
 }
 
-function parseOrgs(text) {
-  return text
-    .split(/[\s,]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
 async function showCacheState() {
   const stored = await browser.storage.local.get(CACHE_KEY);
   const cache = stored[CACHE_KEY];
