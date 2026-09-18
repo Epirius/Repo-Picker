@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Repo Picker</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #1b1b1d;
+        --muted: #5b5b66;
+        --bg: #ffffff;
+        --field: #ffffff;
+        --border: #cfcfd8;
+        --accent: #0060df;
+        --error: #c50042;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #f9f9fb;
+          --muted: #b1b1bb;
+          --bg: #1c1b22;
+          --field: #2b2a33;
+          --border: #52525e;
+          --accent: #00ddff;
+          --error: #ff9aa2;
+        }
+      }
+      body {
+        font: 13px/1.5 system-ui, sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+        margin: 0;
+        padding: 14px;
+        width: 260px;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 2px;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+      p.error {
+        color: var(--error);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      button {
+        font: inherit;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--field);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--bg);
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      a {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Repo Picker</h1>
+    <p id="status">Loading...</p>
+    <div class="row">
+      <button id="reindex" class="primary">Reindex now</button>
+      <button id="settings">Settings</button>
+    </div>
+  </body>
+  <script src="popup.js"></script>
+</html>

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Repo Picker",
-  "version": "1.0.8",
+  "version": "1.0.11",
   "description": "Type gh in the address bar, then a repo name, to jump straight to it.",
   "browser_specific_settings": {
     "gecko": {
@@ -31,5 +31,17 @@
   },
   "optional_host_permissions": [
     "https://github.com/settings/*"
-  ]
+  ],
+  "action": {
+    "default_title": "Repo Picker",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon.svg",
+      "32": "icon.svg"
+    }
+  },
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg"
+  }
 }
