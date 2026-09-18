@@ -59,6 +59,13 @@ class GitHubError extends Error {
   }
 }
 
+function configError(message) {
+  const err = new GitHubError(message);
+  err.actionLabel = "Open options";
+  err.actionMessage = "openOptions";
+  return err;
+}
+
 function orgFromUrl(url) {
   return decodeURIComponent(url.match(/\/orgs\/([^/?]+)/)?.[1] || "");
 }
@@ -109,13 +116,20 @@ async function fetchPaged(url, token) {
   const out = [];
   let next = url;
   while (next) {
-    const res = await fetch(next, {
-      headers: {
-        Accept: "application/vnd.github+json",
-        Authorization: `Bearer ${token}`,
-        "X-GitHub-Api-Version": "2022-11-28"
-      }
-    });
+    let res;
+    try {
+      res = await fetch(next, {
+        headers: {
+          Accept: "application/vnd.github+json",
+          Authorization: `Bearer ${token}`,
+          "X-GitHub-Api-Version": "2022-11-28"
+        }
+      });
+    } catch {
+      throw configError(
+        "Could not reach api.github.com. Open the options page and click Save and fetch to grant access."
+      );
+    }
     if (!res.ok) throw await githubError(res, next);
     out.push(...(await res.json()));
     next = nextPageUrl(res.headers.get("Link"));
@@ -127,9 +141,11 @@ async function refreshRepos() {
   if (inFlight) return inFlight;
   inFlight = (async () => {
     const { orgs, token, includePersonal } = await getConfig();
-    if (!token) throw new Error("No access token set. Open the extension options.");
+    if (!token) throw configError("No access token saved yet.");
     if (!orgs.length && !includePersonal) {
-      throw new Error("No organizations set. Open the extension options.");
+      throw configError(
+        "No organization saved yet. Add one in the options page, then click Save and fetch."
+      );
     }
 
     const urls = orgs.map(
@@ -163,7 +179,8 @@ async function refreshRepos() {
       fetchedAt: memo.fetchedAt,
       error: null,
       actionUrl: null,
-      actionLabel: null
+      actionLabel: null,
+      actionMessage: null
     });
     return memo;
   })();
@@ -174,7 +191,8 @@ async function refreshRepos() {
     await setStatus({
       error: String(err.message || err),
       actionUrl: err.actionUrl || null,
-      actionLabel: err.actionLabel || null
+      actionLabel: err.actionLabel || null,
+      actionMessage: err.actionMessage || null
     });
     throw err;
   } finally {
@@ -363,7 +381,8 @@ async function fetchResult() {
       ok: false,
       error: String(err.message || err),
       actionUrl: err.actionUrl || null,
-      actionLabel: err.actionLabel || null
+      actionLabel: err.actionLabel || null,
+      actionMessage: err.actionMessage || null
     };
   }
 }
@@ -392,6 +411,11 @@ browser.permissions.onRemoved.addListener(syncCapture);
 syncCapture();
 
 browser.runtime.onMessage.addListener(async (message) => {
+  if (message?.type === "openOptions") {
+    await browser.runtime.openOptionsPage();
+    return { ok: true };
+  }
+
   if (message?.type === "refresh") return fetchResult();
 
   if (message?.type === "token") {

@@ -11,6 +11,8 @@ const saveEl = document.getElementById("save");
 const refreshEl = document.getElementById("refresh");
 const statusEl = document.getElementById("status");
 
+let persistTimer = null;
+
 document.getElementById("keyword").textContent =
   browser.runtime.getManifest().omnibox.keyword;
 
@@ -83,12 +85,30 @@ async function fetchNow() {
   }
 }
 
+async function persist() {
+  clearTimeout(persistTimer);
+  const stored = await browser.storage.local.get(CONFIG_KEY);
+  await browser.storage.local.set({
+    [CONFIG_KEY]: {
+      ...(stored[CONFIG_KEY] || {}),
+      orgs: parseOrgs(orgsEl.value),
+      token: tokenEl.value.trim(),
+      includePersonal: personalEl.checked
+    }
+  });
+}
+
+function persistSoon() {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(persist, 300);
+}
+
+orgsEl.addEventListener("input", persistSoon);
+tokenEl.addEventListener("input", persistSoon);
+personalEl.addEventListener("change", persistSoon);
+
 saveEl.addEventListener("click", async () => {
-  const config = {
-    orgs: parseOrgs(orgsEl.value),
-    token: tokenEl.value.trim(),
-    includePersonal: personalEl.checked
-  };
+  await persist();
 
   if (!(await browser.permissions.contains(ORIGINS))) {
     const granted = await browser.permissions.request(ORIGINS);
@@ -98,8 +118,7 @@ saveEl.addEventListener("click", async () => {
     }
   }
 
-  await browser.storage.local.set({ [CONFIG_KEY]: config });
-  orgsEl.value = config.orgs.join("\n");
+  orgsEl.value = parseOrgs(orgsEl.value).join("\n");
   await fetchNow();
 });
 
@@ -107,7 +126,10 @@ refreshEl.addEventListener("click", fetchNow);
 
 browser.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  if (changes[CONFIG_KEY]) tokenEl.value = changes[CONFIG_KEY].newValue?.token || "";
+  const nextToken = changes[CONFIG_KEY]?.newValue?.token;
+  if (nextToken !== undefined && nextToken !== tokenEl.value && document.activeElement !== tokenEl) {
+    tokenEl.value = nextToken || "";
+  }
   if (changes[CACHE_KEY]) showCacheState();
 });
 

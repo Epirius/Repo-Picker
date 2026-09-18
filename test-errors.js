@@ -71,4 +71,11 @@ const cases = [
     print(`  action:  ${err.actionLabel ?? "(none)"} -> ${err.actionUrl ?? "(none)"}`);
   }
 
+  print("");
+  print("config errors (no network call made):");
+  for (const message of ["No access token saved yet.", "No organization saved yet."]) {
+    const err = configError(message);
+    print(`  ${err.message}`);
+    print(`    action: ${err.actionLabel} -> sends {type: "${err.actionMessage}"}`);
+  }
 })();
