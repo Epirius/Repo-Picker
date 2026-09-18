@@ -1,5 +1,7 @@
 const CONFIG_KEY = "config";
 const CACHE_KEY = "repoCache";
+const CLASSIC_URL = "https://github.com/settings/tokens/new?description=Repo%20Picker&scopes=repo";
+const TOKEN_MONTHS = 6;
 const ORIGINS = { origins: ["https://api.github.com/*"] };
 const CAPTURE = { origins: ["https://github.com/settings/*"] };
 
@@ -17,6 +19,15 @@ let persistTimer = null;
 
 document.getElementById("keyword").textContent =
   browser.runtime.getManifest().omnibox.keyword;
+
+function monthsAhead(count) {
+  const date = new Date();
+  date.setMonth(date.getMonth() + count);
+  return date.toISOString().slice(0, 10);
+}
+
+document.getElementById("new-classic").href =
+  `${CLASSIC_URL}&default_expires_at=${monthsAhead(TOKEN_MONTHS)}`;
 
 function say(text, kind = "", action = null) {
   statusEl.textContent = text;
