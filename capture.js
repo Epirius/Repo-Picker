@@ -71,9 +71,10 @@ function actionButton(result) {
     return button;
   }
 
-  if (result.actionUrl) {
+  const href = httpsUrl(result.actionUrl);
+  if (href) {
     const link = document.createElement("a");
-    link.href = result.actionUrl;
+    link.href = href;
     link.target = "_blank";
     link.rel = "noopener";
     link.textContent = result.actionLabel || "Fix this";

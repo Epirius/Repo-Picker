@@ -18,10 +18,12 @@ globalThis.browser = {
   scripting: {
     getRegisteredContentScripts: () => resolve([]),
     registerContentScripts: () => resolve(),
+    updateContentScripts: () => resolve(),
     unregisterContentScripts: () => resolve()
   }
 };
 
+load("https-url.js");
 load("background.js");
 
 function fakeResponse(status, body, headers = {}) {
@@ -51,6 +53,13 @@ const cases = [
   [
     "SAML, header stripped",
     fakeResponse(403, JSON.stringify({ message: "Resource protected by organization SAML enforcement." })),
+    ORG_URL
+  ],
+  [
+    "SAML, with a header that tries to smuggle a script url",
+    fakeResponse(403, JSON.stringify({ message: "Resource protected by organization SAML enforcement." }), {
+      "X-GitHub-SSO": "required; url=javascript:alert(document.domain)"
+    }),
     ORG_URL
   ],
   ["bad token", fakeResponse(401, JSON.stringify({ message: "Bad credentials" })), ORG_URL],

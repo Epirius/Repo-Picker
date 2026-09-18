@@ -29,6 +29,7 @@ globalThis.browser = {
   scripting: {
     getRegisteredContentScripts: () => resolve([]),
     registerContentScripts: () => resolve(),
+    updateContentScripts: () => resolve(),
     unregisterContentScripts: () => resolve()
   }
 };
@@ -74,6 +75,7 @@ globalThis.fetch = (url) => {
   });
 };
 
+load("https-url.js");
 load("background.js");
 
 (async () => {

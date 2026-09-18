@@ -178,7 +178,10 @@ full value GitHub shows you once, right after creation.
 
 The token sits in `browser.storage.local` for this profile. It never leaves the browser
 except in requests to `api.github.com`. Pagination follows the `Link` header, so that
-header is checked against the API host before the next request carries the token.
+header is checked against the API host before the next request carries the token, and a
+GitHub response that suggests a link for the user to click can only produce an `https:`
+one. Both guards assume a hostile response, which is what a TLS-intercepting proxy can
+produce without compromising GitHub itself.
 
 ## Files
 
@@ -186,4 +189,5 @@ header is checked against the API host before the next request carries the token
 - `background.js` fetching, caching, scoring, the omnibox handlers
 - `options.html` / `options.js` org list, token, manual refresh
 - `capture.js` optional content script that offers to save a new token
+- `https-url.js` the scheme check shared by every page that renders a link
 - `set-keyword.py` rewrites the keyword and repackages

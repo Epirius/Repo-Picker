@@ -18,10 +18,12 @@ globalThis.browser = {
   scripting: {
     getRegisteredContentScripts: () => resolve([]),
     registerContentScripts: () => resolve(),
+    updateContentScripts: () => resolve(),
     unregisterContentScripts: () => resolve()
   }
 };
 
+load("https-url.js");
 load("background.js");
 
 const owner = "acme";

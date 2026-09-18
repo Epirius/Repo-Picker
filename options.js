@@ -21,9 +21,10 @@ document.getElementById("keyword").textContent =
 function say(text, kind = "", action = null) {
   statusEl.textContent = text;
   statusEl.className = kind;
-  if (!action?.url) return;
+  const href = httpsUrl(action?.url);
+  if (!href) return;
   const link = document.createElement("a");
-  link.href = action.url;
+  link.href = href;
   link.target = "_blank";
   link.rel = "noopener";
   link.textContent = action.label || "Fix this";

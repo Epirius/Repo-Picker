@@ -68,7 +68,7 @@ function nextPageUrl(linkHeader) {
 class GitHubError extends Error {
   constructor(message, actionUrl, actionLabel) {
     super(message);
-    this.actionUrl = actionUrl || null;
+    this.actionUrl = httpsUrl(actionUrl);
     this.actionLabel = actionLabel || null;
     this.status = 0;
   }
@@ -104,7 +104,7 @@ async function describeFailure(res, url) {
 
   if (res.status === 403 && /SAML/i.test(message)) {
     const sso = res.headers.get("X-GitHub-SSO") || "";
-    const link = sso.match(/url=(\S+)/)?.[1];
+    const link = httpsUrl(sso.match(/url=(\S+)/)?.[1]);
     return new GitHubError(
       `${org || "This organization"} uses SAML single sign-on, and this token is not authorized for it yet.`,
       link || (org ? `https://github.com/orgs/${org}/sso` : "https://github.com/settings/tokens"),
@@ -463,22 +463,27 @@ async function fetchResult() {
   }
 }
 
+const CAPTURE_SCRIPT = {
+  id: CAPTURE_ID,
+  matches: [CAPTURE_ORIGIN],
+  js: ["https-url.js", "capture.js"],
+  runAt: "document_idle",
+  persistAcrossSessions: true
+};
+
 async function syncCapture() {
   const granted = await browser.permissions.contains({ origins: [CAPTURE_ORIGIN] });
-  const registered = await browser.scripting.getRegisteredContentScripts({ ids: [CAPTURE_ID] });
+  const [registered] = await browser.scripting.getRegisteredContentScripts({ ids: [CAPTURE_ID] });
 
-  if (granted && !registered.length) {
-    await browser.scripting.registerContentScripts([
-      {
-        id: CAPTURE_ID,
-        matches: [CAPTURE_ORIGIN],
-        js: ["capture.js"],
-        runAt: "document_idle",
-        persistAcrossSessions: true
-      }
-    ]);
-  } else if (!granted && registered.length) {
-    await browser.scripting.unregisterContentScripts({ ids: [CAPTURE_ID] });
+  if (!granted) {
+    if (registered) await browser.scripting.unregisterContentScripts({ ids: [CAPTURE_ID] });
+    return;
+  }
+  if (!registered) {
+    await browser.scripting.registerContentScripts([CAPTURE_SCRIPT]);
+  } else if (String(registered.js) !== String(CAPTURE_SCRIPT.js)) {
+    // a registration persisted from an older version keeps that version's file list
+    await browser.scripting.updateContentScripts([CAPTURE_SCRIPT]);
   }
 }
 
