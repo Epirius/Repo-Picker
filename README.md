@@ -122,11 +122,31 @@ install permanently. The pref does nothing on release builds.
 
 ## Releasing
 
-`build.py` copies the packaged files into `dist/` and zips them. The tests and this README
-stay out of the build, so what Firefox loads is only what it runs.
+`build.py` copies the packaged files into `dist/` and zips them. The tests, this README
+and the workflow stay out of the build, so what Firefox loads is only what it runs.
 
-`run-tests.js` runs every harness under Node. On a Mac they also run one at a time under
-Safari's engine, `jsc test-orgs.js`, which needs nothing installed.
+`run-tests.js` runs every harness under Node, which is how CI runs them. On a Mac they
+also run one at a time under Safari's engine, `jsc test-orgs.js`, which needs nothing
+installed.
+
+`.github/workflows/release.yml` tests, builds, and submits to addons.mozilla.org. It needs
+two repository secrets, `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`, generated under API keys in
+the AMO Developer Hub.
+
+Cutting a release is two steps.
+
+1. Bump `version` in `manifest.json`, since AMO refuses a version it has already seen
+2. Commit, then `git tag v1.0.18 && git push --tags`
+
+The tag has to match the manifest version, or the build stops before anything is uploaded.
+A `v*` tag publishes to the listed channel. Running the workflow by hand from the Actions
+tab offers `unlisted` instead, which is signed on the spot and attached to the GitHub
+release as an `.xpi` you can install directly.
+
+The first listed version still has to go through the submission form by hand, because AMO
+wants a name, summary, category and license before a listing exists. Every version after
+that is the workflow's job. Listed versions wait in a review queue, so the job uploads and
+exits rather than sitting on the queue until it times out.
 
 ## Token
 
@@ -226,3 +246,4 @@ produce without compromising GitHub itself.
 - `build.py` copies the packaged files into `dist/` and zips them
 - `set-keyword.py` rewrites the keyword and repackages
 - `run-tests.js` runs the test harnesses under Node
+- `.github/workflows/release.yml` tests, builds and submits to addons.mozilla.org

@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Which addons.mozilla.org channel to publish to
+        type: choice
+        options: [listed, unlisted]
+        default: listed
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: node run-tests.js
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      CHANNEL: ${{ inputs.channel || 'listed' }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Build dist
+        run: |
+          if [ "${{ github.ref_type }}" = tag ]; then
+            python3 build.py --expect-version "${{ github.ref_name }}"
+          else
+            python3 build.py
+          fi
+
+      - name: Submit to addons.mozilla.org
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_JWT_ISSUER }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+        run: |
+          # A listed version waits in a human review queue, so the job uploads it and
+          # leaves. An unlisted one is signed on the spot and comes back as an xpi.
+          if [ "$CHANNEL" = listed ]; then
+            wait=(--approval-timeout 0)
+          else
+            wait=()
+          fi
+          npx --yes web-ext@10 sign \
+            --source-dir dist \
+            --artifacts-dir artifacts \
+            --channel "$CHANNEL" \
+            "${wait[@]}"
+
+      - name: Attach the signed build to the release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          signed=""
+          for file in artifacts/*.xpi; do
+            if [ -e "$file" ]; then
+              signed="$file"
+              break
+            fi
+          done
+          if [ -z "$signed" ]; then
+            echo "no xpi to attach, which is what a listed submission looks like until it is reviewed"
+            exit 0
+          fi
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" "$signed" --clobber
