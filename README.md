@@ -108,7 +108,7 @@ This version disappears when Firefox restarts.
 Firefox release builds refuse unsigned extensions, so a permanent install means getting
 it signed. Signing is free and an unlisted add-on skips review.
 
-1. `zip -r -FS repo-picker.zip . -x '*.git*' 'repo-picker.zip'`
+1. `python3 build.py`
 2. Go to https://addons.mozilla.org/developers/addon/submit/distribution
 3. Choose "On your own" for distribution, upload the zip
 4. Download the signed `.xpi`
@@ -119,6 +119,11 @@ Changing the extension means bumping `version` in `manifest.json` and repeating 
 The alternative is Firefox Developer Edition, Nightly or ESR, where setting
 `xpinstall.signatures.required` to `false` in `about:config` lets an unsigned add-on
 install permanently. The pref does nothing on release builds.
+
+## Releasing
+
+`build.py` copies the packaged files into `dist/` and zips them. The tests and this README
+stay out of the build, so what Firefox loads is only what it runs.
 
 ## Token
 
@@ -215,4 +220,5 @@ produce without compromising GitHub itself.
 - `capture.js` optional content script that offers to save a new token
 - `https-url.js` the scheme check shared by every page that renders a link
 - `expiry.js` parses the expiry header and phrases the warning
+- `build.py` copies the packaged files into `dist/` and zips them
 - `set-keyword.py` rewrites the keyword and repackages

@@ -5,15 +5,12 @@ import argparse
 import json
 import pathlib
 import re
-import subprocess
 import sys
+
+import build
 
 HERE = pathlib.Path(__file__).resolve().parent
 MANIFEST = HERE / "manifest.json"
-ZIP_NAME = "repo-picker.zip"
-PACKAGED = ["manifest.json", "background.js", "options.html", "options.js", "capture.js",
-            "popup.html", "popup.js", "icon.svg", "orgs.js", "https-url.js",
-            "expiry.js"]
 VALID = re.compile(r"^[^\s\"'<>]+$")
 DESCRIPTION = "Type {kw} in the address bar, then a repo name, to jump straight to it."
 
@@ -32,7 +29,7 @@ def main():
     parser.add_argument("--keep-version", action="store_true",
                         help="do not bump the patch version")
     parser.add_argument("--no-zip", action="store_true",
-                        help="do not rebuild repo-picker.zip")
+                        help="do not rebuild dist/ and repo-picker.zip")
     args = parser.parse_args()
 
     manifest = json.loads(MANIFEST.read_text())
@@ -62,10 +59,7 @@ def main():
     print(f"keyword: {current} -> {keyword}  (version {manifest['version']})")
 
     if not args.no_zip:
-        target = HERE / ZIP_NAME
-        target.unlink(missing_ok=True)
-        subprocess.run(["zip", "-q", "-FS", ZIP_NAME, *PACKAGED], cwd=HERE, check=True)
-        print(f"repackaged {target}")
+        print(f"repackaged {build.package()}")
 
     print("reload the add-on in about:debugging, or re-sign the zip for a permanent install")
     return 0
