@@ -49,6 +49,60 @@ function nextPageUrl(linkHeader) {
   return null;
 }
 
+class GitHubError extends Error {
+  constructor(message, actionUrl, actionLabel) {
+    super(message);
+    this.actionUrl = actionUrl || null;
+    this.actionLabel = actionLabel || null;
+  }
+}
+
+function orgFromUrl(url) {
+  return decodeURIComponent(url.match(/\/orgs\/([^/?]+)/)?.[1] || "");
+}
+
+async function githubError(res, url) {
+  const body = await res.text();
+  let message = body.slice(0, 200);
+  try {
+    message = JSON.parse(body).message || message;
+  } catch {
+    // a non-JSON body is rare, but the raw text is still the best clue
+  }
+
+  const org = orgFromUrl(url);
+
+  if (res.status === 403 && /SAML/i.test(message)) {
+    const sso = res.headers.get("X-GitHub-SSO") || "";
+    const link = sso.match(/url=(\S+)/)?.[1];
+    return new GitHubError(
+      `${org || "This organization"} uses SAML single sign-on, and this token is not authorized for it yet.`,
+      link || (org ? `https://github.com/orgs/${org}/sso` : "https://github.com/settings/tokens"),
+      "Authorize the token"
+    );
+  }
+
+  if (res.status === 401) {
+    return new GitHubError(
+      "GitHub rejected the token. It may be mistyped, revoked or expired.",
+      "https://github.com/settings/tokens",
+      "Manage tokens"
+    );
+  }
+
+  if (res.status === 403 && /rate limit/i.test(message)) {
+    return new GitHubError("GitHub rate limit reached. Try again in a few minutes.");
+  }
+
+  if (res.status === 404 && org) {
+    return new GitHubError(
+      `No organization named ${org}, or this token cannot see it. Check the spelling against the URL on GitHub.`
+    );
+  }
+
+  return new GitHubError(`GitHub returned ${res.status}: ${message}`);
+}
+
 async function fetchPaged(url, token) {
   const out = [];
   let next = url;
@@ -60,10 +114,7 @@ async function fetchPaged(url, token) {
         "X-GitHub-Api-Version": "2022-11-28"
       }
     });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`GitHub returned ${res.status}: ${body.slice(0, 200)}`);
-    }
+    if (!res.ok) throw await githubError(res, next);
     out.push(...(await res.json()));
     next = nextPageUrl(res.headers.get("Link"));
   }
@@ -105,14 +156,24 @@ async function refreshRepos() {
     const repos = [...byFullName.values()].sort((a, b) => b.pushedAt - a.pushedAt);
     memo = { repos, fetchedAt: Date.now() };
     await browser.storage.local.set({ [CACHE_KEY]: memo });
-    await setStatus({ count: repos.length, fetchedAt: memo.fetchedAt, error: null });
+    await setStatus({
+      count: repos.length,
+      fetchedAt: memo.fetchedAt,
+      error: null,
+      actionUrl: null,
+      actionLabel: null
+    });
     return memo;
   })();
 
   try {
     return await inFlight;
   } catch (err) {
-    await setStatus({ error: String(err.message || err) });
+    await setStatus({
+      error: String(err.message || err),
+      actionUrl: err.actionUrl || null,
+      actionLabel: err.actionLabel || null
+    });
     throw err;
   } finally {
     inFlight = null;
@@ -291,8 +352,20 @@ browser.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === REFRESH_ALARM) refreshIfStale();
 });
 
+async function fetchResult() {
+  try {
+    const cache = await refreshRepos();
+    return { ok: true, count: cache.repos.length, fetchedAt: cache.fetchedAt };
+  } catch (err) {
+    return {
+      ok: false,
+      error: String(err.message || err),
+      actionUrl: err.actionUrl || null,
+      actionLabel: err.actionLabel || null
+    };
+  }
+}
+
 browser.runtime.onMessage.addListener(async (message) => {
-  if (message?.type !== "refresh") return;
-  const cache = await refreshRepos();
-  return { count: cache.repos.length, fetchedAt: cache.fetchedAt };
+  if (message?.type === "refresh") return fetchResult();
 });

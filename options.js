@@ -12,9 +12,16 @@ const statusEl = document.getElementById("status");
 document.getElementById("keyword").textContent =
   browser.runtime.getManifest().omnibox.keyword;
 
-function say(text, kind = "") {
+function say(text, kind = "", action = null) {
   statusEl.textContent = text;
   statusEl.className = kind;
+  if (!action?.url) return;
+  const link = document.createElement("a");
+  link.href = action.url;
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = action.label || "Fix this";
+  statusEl.append(" ", link);
 }
 
 function parseOrgs(text) {
@@ -50,8 +57,12 @@ async function fetchNow() {
   say("Fetching...");
   try {
     const result = await browser.runtime.sendMessage({ type: "refresh" });
-    const when = new Date(result.fetchedAt).toLocaleString();
-    say(`${result.count} repositories cached, last fetched ${when}.`, "ok");
+    if (result.ok) {
+      const when = new Date(result.fetchedAt).toLocaleString();
+      say(`${result.count} repositories cached, last fetched ${when}.`, "ok");
+    } else {
+      say(result.error, "error", { url: result.actionUrl, label: result.actionLabel });
+    }
   } catch (err) {
     say(String(err.message || err), "error");
   } finally {
