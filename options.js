@@ -7,6 +7,8 @@ const orgsEl = document.getElementById("orgs");
 const tokenEl = document.getElementById("token");
 const personalEl = document.getElementById("personal");
 const captureEl = document.getElementById("capture");
+const starredEl = document.getElementById("starred");
+const followingEl = document.getElementById("following");
 const saveEl = document.getElementById("save");
 const refreshEl = document.getElementById("refresh");
 const statusEl = document.getElementById("status");
@@ -52,6 +54,8 @@ async function load() {
   orgsEl.value = (config.orgs || []).join("\n");
   tokenEl.value = config.token || "";
   personalEl.checked = Boolean(config.includePersonal);
+  starredEl.checked = Boolean(config.includeStarred);
+  followingEl.checked = Boolean(config.includeFollowing);
   captureEl.checked = await browser.permissions.contains(CAPTURE);
   await showCacheState();
 }
@@ -93,7 +97,9 @@ async function persist() {
       ...(stored[CONFIG_KEY] || {}),
       orgs: parseOrgs(orgsEl.value),
       token: tokenEl.value.trim(),
-      includePersonal: personalEl.checked
+      includePersonal: personalEl.checked,
+      includeStarred: starredEl.checked,
+      includeFollowing: followingEl.checked
     }
   });
 }
@@ -106,6 +112,8 @@ function persistSoon() {
 orgsEl.addEventListener("input", persistSoon);
 tokenEl.addEventListener("input", persistSoon);
 personalEl.addEventListener("change", persistSoon);
+starredEl.addEventListener("change", persistSoon);
+followingEl.addEventListener("change", persistSoon);
 
 saveEl.addEventListener("click", async () => {
   await persist();

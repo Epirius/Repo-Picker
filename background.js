@@ -24,6 +24,8 @@ async function getConfig() {
     orgs: [],
     token: "",
     includePersonal: false,
+    includeStarred: false,
+    includeFollowing: false,
     ...(stored[CONFIG_KEY] || {})
   };
 }
@@ -137,12 +139,37 @@ async function fetchPaged(url, token) {
   return out;
 }
 
+async function mapLimit(items, limit, worker) {
+  const queue = [...items];
+  const runners = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) await worker(queue.shift());
+  });
+  await Promise.all(runners);
+}
+
+async function followedRepos(token) {
+  const following = await fetchPaged(`${API}/user/following?per_page=100`, token);
+  const out = [];
+  await mapLimit(following, 6, async (user) => {
+    try {
+      const repos = await fetchPaged(
+        `${API}/users/${encodeURIComponent(user.login)}/repos?per_page=100&type=owner&sort=pushed`,
+        token
+      );
+      out.push(...repos);
+    } catch {
+      // a followed account can be deleted or made private between the two calls
+    }
+  });
+  return out;
+}
+
 async function refreshRepos() {
   if (inFlight) return inFlight;
   inFlight = (async () => {
-    const { orgs, token, includePersonal } = await getConfig();
+    const { orgs, token, includePersonal, includeStarred, includeFollowing } = await getConfig();
     if (!token) throw configError("No access token saved yet.");
-    if (!orgs.length && !includePersonal) {
+    if (!orgs.length && !includePersonal && !includeStarred && !includeFollowing) {
       throw configError(
         "No organization saved yet. Add one in the options page, then click Save and fetch."
       );
@@ -155,11 +182,16 @@ async function refreshRepos() {
     if (includePersonal) {
       urls.push(`${API}/user/repos?per_page=100&affiliation=owner,collaborator&sort=pushed`);
     }
+    if (includeStarred) {
+      urls.push(`${API}/user/starred?per_page=100`);
+    }
 
     const pages = await Promise.all(urls.map((u) => fetchPaged(u, token)));
+    const found = pages.flat();
+    if (includeFollowing) found.push(...(await followedRepos(token)));
 
     const byFullName = new Map();
-    for (const repo of pages.flat()) {
+    for (const repo of found) {
       byFullName.set(repo.full_name, {
         name: repo.name,
         owner: repo.owner?.login || repo.full_name.split("/")[0],
