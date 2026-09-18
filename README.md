@@ -176,6 +176,18 @@ The script matches on the token format, `ghp_` plus 36 characters or `github_pat
 82, so the truncated prefixes listed on the token index page do not trigger it. Only the
 full value GitHub shows you once, right after creation.
 
+### Storage
+
+The token sits in `browser.storage.local` for this profile, as plain text. Firefox gives
+an extension nowhere to put a secret that the rest of the machine cannot read, so anything
+with access to the profile directory can read it. The options page says so rather than
+leaving you to assume otherwise.
+
+Two things take the edge off that. The classic button asks for a token that expires six
+months out, through the same `default_expires_at` parameter that used to say `none`. And
+the index survives without the token, so indexing once and then clicking Forget token
+leaves a working repo list and nothing on disk to steal.
+
 ### Expiry
 
 Every authenticated response carries `GitHub-Authentication-Token-Expiration` when the
@@ -186,8 +198,9 @@ remembered date, so a fresh token is never judged by the old one's deadline.
 
 ### Where the token can be sent
 
-The token leaves the browser only in requests to `api.github.com`. Pagination follows the `Link` header, so that
-header is checked against the API host before the next request carries the token, and a
+The token leaves the browser only in requests to `api.github.com`. Pagination follows the
+`Link` header, so that header is checked against the API host before the next request
+carries the token, and a
 GitHub response that suggests a link for the user to click can only produce an `https:`
 one. Both guards assume a hostile response, which is what a TLS-intercepting proxy can
 produce without compromising GitHub itself.

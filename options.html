@@ -218,7 +218,19 @@
           underneath it are locked on rather than optional.
         </p>
 
-        <p class="hint">Either token is stored in this browser profile and nowhere else.</p>
+        <h2 class="sub">Where the token ends up</h2>
+        <p class="hint">
+          In this browser profile's extension storage, as plain text. Firefox has nowhere to put
+          an extension's secret that other software on the machine cannot read, so anything with
+          access to your profile directory can read this one. It is sent only to
+          <code>api.github.com</code>, and never anywhere else.
+        </p>
+        <p class="hint">
+          Two things help. The classic button asks GitHub for a token that expires in six months,
+          and Repo Picker tells you when that date is near. And the list of repositories keeps
+          working without the token, so you can index once, click <em>Forget token</em>, and paste
+          a new one in when you want a fresh index.
+        </p>
       </div>
 
       <div class="field check">

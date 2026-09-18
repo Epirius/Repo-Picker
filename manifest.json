@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Repo Picker",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Type gh in the address bar, then a repo name, to jump straight to it.",
   "browser_specific_settings": {
     "gecko": {
