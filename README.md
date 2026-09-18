@@ -178,15 +178,17 @@ full value GitHub shows you once, right after creation.
 
 ### Storage
 
-The token sits in `browser.storage.local` for this profile, as plain text. Firefox gives
-an extension nowhere to put a secret that the rest of the machine cannot read, so anything
-with access to the profile directory can read it. The options page says so rather than
-leaving you to assume otherwise.
+The token sits in `browser.storage.local` for this profile, as plain text. Firefox offers
+extensions no encrypted storage and no route to the OS keychain, so that file in the
+profile folder is the only place to put it, and any program running as the same user can
+read it. The options page says so rather than leaving people to assume otherwise.
 
-Two things take the edge off that. The classic button asks for a token that expires six
-months out, through the same `default_expires_at` parameter that used to say `none`. And
-the index survives without the token, so indexing once and then clicking Forget token
-leaves a working repo list and nothing on disk to steal.
+It also says what to do about it. Searching reads the cached list, not GitHub, so once a
+fetch has finished the token earns nothing by staying. Forget token leaves every
+repository already fetched searchable, and nothing on disk worth stealing. The cost is
+that repositories created afterwards need a token pasted back in and another fetch. For anyone
+who keeps one saved, the classic button asks for six months through the same
+`default_expires_at` parameter that used to say `none`.
 
 ### Expiry
 

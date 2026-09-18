@@ -220,16 +220,22 @@
 
         <h2 class="sub">Where the token ends up</h2>
         <p class="hint">
-          In this browser profile's extension storage, as plain text. Firefox has nowhere to put
-          an extension's secret that other software on the machine cannot read, so anything with
-          access to your profile directory can read this one. It is sent only to
-          <code>api.github.com</code>, and never anywhere else.
+          In this browser profile's extension storage, as plain text. An add-on has nowhere better
+          to put it. Firefox offers extensions no encrypted storage and no way to reach the
+          operating system's keychain, so whatever an add-on saves ends up readable in a file in
+          the profile folder, and any program running under the same account can open that file.
+          The token is sent to <code>api.github.com</code> and to nothing else.
         </p>
         <p class="hint">
-          Two things help. The classic button asks GitHub for a token that expires in six months,
-          and Repo Picker tells you when that date is near. And the list of repositories keeps
-          working without the token, so you can index once, click <em>Forget token</em>, and paste
-          a new one in when you want a fresh index.
+          So it is worth clicking <em>Forget token</em> once a fetch has finished. Searching reads
+          the stored list of repositories rather than GitHub, which means every repository fetched
+          before the token was forgotten stays searchable, and the extension needs no token to keep
+          working. What you give up is new repositories. Anything created or shared with you
+          afterwards shows up only once you paste in a token and fetch again.
+        </p>
+        <p class="hint">
+          If you would rather leave a token saved, the classic button asks GitHub for one that
+          expires in six months, and this page says when that date is near.
         </p>
       </div>
 
