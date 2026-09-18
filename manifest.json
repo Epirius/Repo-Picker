@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "GitHub repo omnibox",
-  "version": "1.0.5",
+  "name": "Repo Picker",
+  "version": "1.0.8",
   "description": "Type gh in the address bar, then a repo name, to jump straight to it.",
   "browser_specific_settings": {
     "gecko": {
-      "id": "gh-omnibox@extension",
+      "id": "repo-picker@extension",
       "strict_min_version": "128.0"
     }
   },

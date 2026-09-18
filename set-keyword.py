@@ -10,7 +10,7 @@ import sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 MANIFEST = HERE / "manifest.json"
-ZIP_NAME = "gh-omnibox.zip"
+ZIP_NAME = "repo-picker.zip"
 PACKAGED = ["manifest.json", "background.js", "options.html", "options.js"]
 VALID = re.compile(r"^[^\s\"'<>]+$")
 DESCRIPTION = "Type {kw} in the address bar, then a repo name, to jump straight to it."
@@ -30,7 +30,7 @@ def main():
     parser.add_argument("--keep-version", action="store_true",
                         help="do not bump the patch version")
     parser.add_argument("--no-zip", action="store_true",
-                        help="do not rebuild gh-omnibox.zip")
+                        help="do not rebuild repo-picker.zip")
     args = parser.parse_args()
 
     manifest = json.loads(MANIFEST.read_text())

@@ -7,7 +7,7 @@ const cases = [
   ["ghp_abc123", false, "truncated prefix from the token list"],
   ["ghp_" + "d".repeat(20), false, "too short"],
   ["github_pat_" + "e".repeat(10), false, "fine-grained, too short"],
-  ["gh-omnibox repo listing", false, "ordinary page text"],
+  ["Repo Picker repo listing", false, "ordinary page text"],
   ["Personal access tokens (classic)", false, "page heading"]
 ];
 

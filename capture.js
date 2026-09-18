@@ -1,5 +1,5 @@
 const TOKEN_RE = /\b(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{50,})\b/;
-const BANNER_ID = "gh-omnibox-banner";
+const BANNER_ID = "repo-picker-banner";
 
 let timer = null;
 
@@ -52,7 +52,7 @@ function showBanner(token) {
     "color:#fff;font:14px/1.4 system-ui,sans-serif;box-shadow:0 1px 6px rgba(0,0,0,0.3)";
 
   const text = document.createElement("span");
-  text.textContent = "Save this token to the GitHub repo omnibox?";
+  text.textContent = "Save this token to Repo Picker?";
 
   const save = document.createElement("button");
   save.textContent = "Save";
