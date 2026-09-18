@@ -9,6 +9,9 @@ const saveEl = document.getElementById("save");
 const refreshEl = document.getElementById("refresh");
 const statusEl = document.getElementById("status");
 
+document.getElementById("keyword").textContent =
+  browser.runtime.getManifest().omnibox.keyword;
+
 function say(text, kind = "") {
   statusEl.textContent = text;
   statusEl.className = kind;

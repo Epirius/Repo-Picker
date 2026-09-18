@@ -10,6 +10,22 @@ Repo names are fetched once from the GitHub API and cached in the browser profil
 then refreshed every six hours. Filtering happens locally, so there is no request per
 keystroke.
 
+## Changing the keyword
+
+```
+./set-keyword.py repo
+```
+
+That rewrites `manifest.json`, bumps the patch version and rebuilds `gh-omnibox.zip`. Run
+it with no argument to print the current keyword. Then reload: hit Reload in
+`about:debugging` for a temporary install, or re-sign the zip for a permanent one.
+
+Firefox has no way to do this from inside the browser. The keyword is fixed in the
+manifest, `browser.omnibox` has no method to change it, and there is no preferences UI
+for extension keywords. The open request for one is
+[bug 1361327](https://bugzilla.mozilla.org/show_bug.cgi?id=1361327). Editing the file and
+reloading is the whole story.
+
 ## Matching
 
 In priority order: exact name, name prefix, `org/name` prefix, substring, then a
@@ -60,6 +76,7 @@ except in requests to `api.github.com`.
 
 ## Files
 
-- `manifest.json` permissions, the `gh` keyword, the Firefox extension id
+- `manifest.json` permissions, the keyword, the Firefox extension id
 - `background.js` fetching, caching, scoring, the omnibox handlers
 - `options.html` / `options.js` org list, token, manual refresh
+- `set-keyword.py` rewrites the keyword and repackages
