@@ -12,6 +12,7 @@ const personalEl = document.getElementById("personal");
 const captureEl = document.getElementById("capture");
 const starredEl = document.getElementById("starred");
 const followingEl = document.getElementById("following");
+const forgetEl = document.getElementById("forget");
 const saveEl = document.getElementById("save");
 const refreshEl = document.getElementById("refresh");
 const statusEl = document.getElementById("status");
@@ -138,6 +139,15 @@ saveEl.addEventListener("click", async () => {
 
   orgsEl.value = parseOrgs(orgsEl.value).join("\n");
   await fetchNow();
+});
+
+forgetEl.addEventListener("click", async () => {
+  const warning =
+    "Forget the saved token? GitHub never shows a token twice, so indexing again means creating a new one.";
+  if (tokenEl.value && !confirm(warning)) return;
+  tokenEl.value = "";
+  await persist();
+  say("Token forgotten. The repositories already indexed still work.");
 });
 
 refreshEl.addEventListener("click", fetchNow);
