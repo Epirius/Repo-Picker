@@ -81,16 +81,16 @@ for (const content of [...links.keys(), "acme/not-indexed", "ledger"]) {
   print(`  ${content}  ->  ${resolveLink(content) ?? "(falls through to search)"}`);
 }
 
-print("--- ranking for 'uf' ---");
+print("--- ranking for 'le' ---");
 const ranked = repos
-  .map((repo) => ({ repo, value: score(repo, "uf") }))
+  .map((repo) => ({ repo, value: score(repo, "le") }))
   .filter((r) => r.value !== null)
   .sort((a, b) => b.value - a.value || b.repo.pushedAt - a.repo.pushedAt);
 for (const { repo, value } of ranked) print(`  ${value}\t${repo.fullName}`);
 
-print("--- ranking for 'usa' (fuzzy) ---");
+print("--- ranking for 'lsa' (fuzzy) ---");
 const fuzzy = repos
-  .map((repo) => ({ repo, value: score(repo, "usa") }))
+  .map((repo) => ({ repo, value: score(repo, "lsa") }))
   .filter((r) => r.value !== null)
   .sort((a, b) => b.value - a.value);
 for (const { repo, value } of fuzzy) print(`  ${value}\t${repo.fullName}`);
