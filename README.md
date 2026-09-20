@@ -147,10 +147,10 @@ submissions from that one run:
   back immediately; this is the closest equivalent. The tracked `manifest.json` and the
   marketplace listing both stay at the real version.
 
-The first listed version still has to go through the submission form by hand, because AMO
-wants a name, summary and category before a listing exists. Every version after that is the
-workflow's job. Listed submissions also require a license per version, which the workflow
-supplies from `.github/amo-metadata.json` — this project is [MIT licensed](LICENSE).
+A listed version needs a license and a category, neither of which has a `manifest.json`
+equivalent, so `.github/amo-metadata.json` supplies them — this project is
+[MIT licensed](LICENSE), filed under `web-development`. The add-on name and summary come
+from `manifest.json`'s own `name` and `description`.
 
 ## Token
 
