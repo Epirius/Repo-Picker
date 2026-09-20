@@ -147,10 +147,10 @@ submissions from that one run:
   back immediately; this is the closest equivalent. The tracked `manifest.json` and the
   marketplace listing both stay at the real version.
 
-A listed version needs a license and a category, neither of which has a `manifest.json`
-equivalent, so `.github/amo-metadata.json` supplies them — this project is
-[MIT licensed](LICENSE), filed under `web-development`. The add-on name and summary come
-from `manifest.json`'s own `name` and `description`.
+A listed version needs a name, summary, category and license before AMO will accept it, so
+`.github/amo-metadata.json` supplies all four — this project is [MIT licensed](LICENSE),
+filed under `web-development`. The name and summary there are meant to mirror
+`manifest.json`'s own `name` and `description`; keep them in sync if either changes.
 
 ## Token
 

@@ -1,4 +1,10 @@
 {
+  "name": {
+    "en-US": "Repo Picker"
+  },
+  "summary": {
+    "en-US": "Type gh in the address bar, then a repo name, to jump straight to it."
+  },
   "categories": {
     "firefox": ["web-development"]
   },
