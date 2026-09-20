@@ -51,7 +51,8 @@ jobs:
             --source-dir dist \
             --artifacts-dir artifacts-listed \
             --channel listed \
-            --approval-timeout 0
+            --approval-timeout 0 \
+            --amo-metadata .github/amo-metadata.json
 
       - name: Build and sign an unlisted download for the GitHub release
         env:

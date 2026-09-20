@@ -153,8 +153,9 @@ matching `vX.Y.Z` tag itself, and does two AMO submissions from that one run:
   marketplace listing both stay at the real version.
 
 The first listed version still has to go through the submission form by hand, because AMO
-wants a name, summary, category and license before a listing exists. Every version after
-that is the workflow's job.
+wants a name, summary and category before a listing exists. Every version after that is the
+workflow's job. Listed submissions also require a license per version, which the workflow
+supplies from `.github/amo-metadata.json` — this project is [MIT licensed](LICENSE).
 
 ## Token
 
