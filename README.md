@@ -12,12 +12,8 @@ keystroke.
 
 ## Changing the keyword
 
-```
-./set-keyword.py repo
-```
-
-That rewrites `manifest.json`, bumps the patch version and rebuilds `repo-picker.zip`. Run
-it with no argument to print the current keyword. Then reload: hit Reload in
+Edit `omnibox.keyword` (and the `description`, which mentions it) in `manifest.json`, then
+`python3 build.py` to rebuild `repo-picker.zip`. Then reload: hit Reload in
 `about:debugging` for a temporary install, or re-sign the zip for a permanent one.
 
 There is no way to do this from inside the browser. The keyword is fixed in the
@@ -134,14 +130,13 @@ runs when you trigger it by hand from the Actions tab — pushing a tag does not
 anything. It needs two repository secrets, `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`, generated
 under API keys in the AMO Developer Hub.
 
-Cutting a release is one step.
+Cutting a release is one step: go to the Actions tab, open "Release", and press "Run
+workflow".
 
-1. Bump `version` in `manifest.json`, since AMO refuses a version it has already seen.
-   Commit and push that.
-2. Go to the Actions tab, open "Release", and press "Run workflow".
-
-The workflow reads the version straight out of `manifest.json`, creates and pushes the
-matching `vX.Y.Z` tag itself, and does two AMO submissions from that one run:
+The workflow bumps the patch version in `manifest.json` itself, since AMO refuses a version
+it has already seen, and commits and pushes that bump to the branch it ran on before doing
+anything else. It then creates and pushes the matching `vX.Y.Z` tag, and does two AMO
+submissions from that one run:
 
 - The manifest's own version is submitted to the **listed** channel — the public
   marketplace listing, which sits in AMO's review queue.
@@ -253,6 +248,5 @@ produce without compromising GitHub itself.
 - `https-url.js` the scheme check shared by every page that renders a link
 - `expiry.js` parses the expiry header and phrases the warning
 - `build.py` copies the packaged files into `dist/` and zips them
-- `set-keyword.py` rewrites the keyword and repackages
 - `run-tests.js` runs the test harnesses under Node
 - `.github/workflows/release.yml` tests, builds and submits to addons.mozilla.org
