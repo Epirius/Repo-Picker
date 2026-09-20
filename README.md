@@ -129,24 +129,32 @@ and the workflow stay out of the build, so what the browser loads is only what i
 also run one at a time under Safari's engine, `jsc test-orgs.js`, which needs nothing
 installed.
 
-`.github/workflows/release.yml` tests, builds, and submits to addons.mozilla.org. It needs
-two repository secrets, `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`, generated under API keys in
-the AMO Developer Hub.
+`.github/workflows/release.yml` tests, builds, and submits to addons.mozilla.org. It only
+runs when you trigger it by hand from the Actions tab — pushing a tag does not publish
+anything. It needs two repository secrets, `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`, generated
+under API keys in the AMO Developer Hub.
 
-Cutting a release is two steps.
+Cutting a release is one step.
 
-1. Bump `version` in `manifest.json`, since AMO refuses a version it has already seen
-2. Commit, then `git tag v1.0.18 && git push --tags`
+1. Bump `version` in `manifest.json`, since AMO refuses a version it has already seen.
+   Commit and push that.
+2. Go to the Actions tab, open "Release", and press "Run workflow".
 
-The tag has to match the manifest version, or the build stops before anything is uploaded.
-A `v*` tag publishes to the listed channel. Running the workflow by hand from the Actions
-tab offers `unlisted` instead, which is signed on the spot and attached to the GitHub
-release as an `.xpi` you can install directly.
+The workflow reads the version straight out of `manifest.json`, creates and pushes the
+matching `vX.Y.Z` tag itself, and does two AMO submissions from that one run:
+
+- The manifest's own version is submitted to the **listed** channel — the public
+  marketplace listing, which sits in AMO's review queue.
+- A second build, stamped one build-number higher (`X.Y.Z.1`) purely to get a distinct
+  version, is submitted to the **unlisted** channel, which signs on the spot. That signed
+  `.xpi` is what gets attached to the GitHub release for direct download — AMO refuses to
+  reuse a version number across channels, so there's no way to get the exact listed build
+  back immediately; this is the closest equivalent. The tracked `manifest.json` and the
+  marketplace listing both stay at the real version.
 
 The first listed version still has to go through the submission form by hand, because AMO
 wants a name, summary, category and license before a listing exists. Every version after
-that is the workflow's job. Listed versions wait in a review queue, so the job uploads and
-exits rather than sitting on the queue until it times out.
+that is the workflow's job.
 
 ## Token
 
